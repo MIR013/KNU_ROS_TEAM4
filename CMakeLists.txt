@@ -11,11 +11,13 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   roscpp
   std_msgs
+  message_generation
+  image_transport
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-
+find_package(OpenCV REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -72,6 +74,10 @@ find_package(catkin REQUIRED COMPONENTS
 #   DEPENDENCIES
 #   std_msgs
 # )
+ generate_messages(
+   DEPENDENCIES
+   std_msgs
+ )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -107,6 +113,10 @@ catkin_package(
 #  LIBRARIES knu_ros_team4
 #  CATKIN_DEPENDS cv_bridge roscpp std_msgs
 #  DEPENDS system_lib
+  INCLUDE_DIRS include
+  LIBRARIES knu_ros_lecture
+  CATKIN_DEPENDS roscpp std_msgs cv_bridge
+  DEPENDS system_lib OpenCV
 )
 
 ###########
@@ -134,6 +144,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/knu_ros_team4_node.cpp)
+add_executable(arrow_detector src/arrow_detector.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -144,11 +155,15 @@ include_directories(
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(arrow_detector knu_ros_lecture_generate_messages_cpp)
+
 
 ## Specify libraries to link a library or executable target against
 # target_link_libraries(${PROJECT_NAME}_node
 #   ${catkin_LIBRARIES}
 # )
+target_link_libraries(arrow_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} )
+
 
 #############
 ## Install ##
