@@ -135,9 +135,9 @@ int whichSide(vector<Point>& arrow)
 	//large triangle's y value > any squre's y value -> left (opencv's w is below direction)
 	//printf("tri large: %lf, squre first: %lf\n",triangle_large[0].first ,square[0].first);
 	if(triangle_large[0].first > square[0].first){
-		return 0;
-	}else{
 		return 1;
+	}else{
+		return 0;
 	}
 	
 }
