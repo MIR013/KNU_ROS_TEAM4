@@ -109,12 +109,8 @@ find_package(OpenCV REQUIRED)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES knu_ros_team4
-#  CATKIN_DEPENDS cv_bridge roscpp std_msgs
-#  DEPENDS system_lib
   INCLUDE_DIRS include
-  LIBRARIES knu_ros_lecture
+  LIBRARIES knu_ros_team4
   CATKIN_DEPENDS roscpp std_msgs cv_bridge
   DEPENDS system_lib OpenCV
 )
@@ -155,7 +151,7 @@ add_executable(arrow_detector src/arrow_detector.cpp)
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(arrow_detector knu_ros_lecture_generate_messages_cpp)
+add_dependencies(arrow_detector knu_ros_team4_generate_messages_cpp)
 
 
 ## Specify libraries to link a library or executable target against
