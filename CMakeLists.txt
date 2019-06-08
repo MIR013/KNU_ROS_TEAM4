@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(OpenCV REQUIRED)
+find_package(GSL REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -141,6 +142,8 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/knu_ros_team4_node.cpp)
 add_executable(arrow_detector src/arrow_detector.cpp)
+#add_executable(lane_driving src/car.cpp)
+add_executable(ros_hw3_2016111813 src/ros_hw3_2016111813.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -152,6 +155,8 @@ add_executable(arrow_detector src/arrow_detector.cpp)
 ## same as for the library above
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(arrow_detector knu_ros_team4_generate_messages_cpp)
+#add_dependencies(lane_driving knu_ros_team4_generate_messages_cpp)
+add_dependencies(ros_hw3_2016111813 knu_ros_team4_generate_messages_cpp)
 
 
 ## Specify libraries to link a library or executable target against
@@ -159,6 +164,8 @@ add_dependencies(arrow_detector knu_ros_team4_generate_messages_cpp)
 #   ${catkin_LIBRARIES}
 # )
 target_link_libraries(arrow_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} )
+#target_link_libraries(lane_driving ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${gsl_LIBRARIES})
+target_link_libraries(ros_hw3_2016111813 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 
 #############

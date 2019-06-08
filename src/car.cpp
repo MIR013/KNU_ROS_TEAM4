@@ -392,7 +392,7 @@ void poseMessageReceived(const sensor_msgs::ImageConstPtr& msg) {
 
 int main(int argc, char** argv)
 {
-   ros::init(argc, argv, "woo");
+   ros::init(argc, argv, "lane_driving");
    ros::NodeHandle nh;
    image_transport::ImageTransport it(nh);
 
