@@ -10,9 +10,9 @@
 using namespace cv;
 using namespace std;
 ///////////////////////////////////////////////////////////////////////////////
-vector< pair<double,double> > square; //90 degree == 270 degree (0.1 radian)
-vector< pair<double,double> > triangle; // 0.4 radian, 2
-vector< pair<double,double> > triangle_large; // 0.8 radian, 1
+vector<vector< pair<double,double> > > square; //90 degree == 270 degree (0.1 radian)
+vector<vector< pair<double,double> > > triangle; // 0.4 radian, 2
+vector<vector< pair<double,double> > > triangle_large; // 0.8 radian, 1
 ros::Publisher pub;
 ///////////////////////////////////////////////////////////////////////////////
 //angle between pt1, pt2 and pt0 -> pt0 is middle
@@ -33,7 +33,7 @@ bool isInVector(vector<pair<double,double> > v, Point value){
 }
 ///////////////////////////////////////////////////////////////////////////////
 // find all od squares
-void find_arrows( Mat& image, vector< vector< Point> >& arrows, vector< vector< pair<double,double> > >&points)
+void find_arrows( Mat& image, vector< vector< Point> >& arrows)
 {
 	// blur will enhance edge detection
 	GaussianBlur(image, image, Size(5,5), 1 ,1);
@@ -48,11 +48,12 @@ void find_arrows( Mat& image, vector< vector< Point> >& arrows, vector< vector< 
 	vector< Point> approx;
 	
 	
-	vector< pair<double,double> > square_test;
-	vector< pair<double,double> > triangle_test;
-	vector< pair<double,double> > triangle_large_test;
 	for (size_t i = 0; i < contours.size(); i++)
 	{
+	
+		vector< pair<double,double> > square_test;
+		vector< pair<double,double> > triangle_test;
+		vector< pair<double,double> > triangle_large_test;
 	
 		approxPolyDP( Mat(contours[i]), approx, arcLength( Mat(contours[i]), true)*0.02, true);
 		
@@ -60,39 +61,42 @@ void find_arrows( Mat& image, vector< vector< Point> >& arrows, vector< vector< 
 		// && isContourConvex( Mat(approx))
 		if (approx.size() == 7 && fabs(contourArea( Mat(approx))) > 5000 )
 		{
+			printf("\n------------------\n");
 			double maxCosine = 0;
 			for (int j = 2; j <= 8; j++)//why 8? - last-first edge check
 			{
 				double cosine = fabs(angle(approx[j%7], approx[j-2], approx[j-1]));
 				//register points
-				if(cosine<0.28){ //not minus value
-					//printf("cosine sq: %lf ",cosine); 	
+				if(cosine<0.20){ //not minus value
+					printf("cosine sq: %lf ",cosine); 	
 					if(!isInVector(square_test,approx[j-1])) square_test.push_back(make_pair(approx[j-1].x,approx[j-1].y));	
 				}
 				else if(cosine>0.35 && cosine<0.58){//triangle small angles
-					//printf("cosine tri: %lf ",cosine); 
+					printf("cosine tri: %lf ",cosine); 
 					if(!isInVector(triangle_test,approx[j-1])) triangle_test.push_back(make_pair(approx[j-1].x,approx[j-1].y));
 				}
 				else if(cosine>0.78){// triangle large angle
-					//printf("cosine tri large: %lf ",cosine); 
+					printf("cosine tri large: %lf ",cosine); 
 					if(!isInVector(triangle_large_test,approx[j-1])) triangle_large_test.push_back(make_pair(approx[j-1].x,approx[j-1].y));
 				}
 			}
-			//printf("\n");
+			printf("\n------------------\n");
 			//4 squre, 3 triangle angle == arrow
+			if (square_test.size()==4 && triangle_test.size() == 2 && triangle_large_test.size() == 1){ 
+				//check arrow delicately
+			
+			
+
+				arrows.push_back(approx);
+			
+				square.push_back(square_test);
+				triangle.push_back(triangle_test);
+				triangle_large.push_back(triangle_large_test);
+				
+			}
 
 		}
-		if (square_test.size()==4&& triangle_test.size() == 2 && triangle_large_test.size() == 1){ 
-			//check arrow delicately
-			arrows.push_back(approx);
-			
-			points.push_back(square);
-			//square_test.swap(square);
-			points.push_back(triangle);
-			//triangle_test.swap(triangle);
-			points.push_back(triangle_large);
-			//triangle_large_test.swap(triangle_large);
-		}
+
 		
 		
 		
@@ -100,9 +104,9 @@ void find_arrows( Mat& image, vector< vector< Point> >& arrows, vector< vector< 
 }
 ///////////////////////////////////////////////////////////////////////////////
 // find largest one!!
-void find_largest_arrow(const vector<vector <Point> >& arrows, vector<Point>& biggest_arrow, vector< vector< pair<double,double> > >&points) {
+int find_largest_arrow(const vector<vector <Point> >& arrows, vector<Point>& biggest_arrow) {
 	if (!arrows.size()) {
-		return;
+		return -1;
 	}
 	int max_width = 0;
 	int max_height = 0;
@@ -117,38 +121,33 @@ void find_largest_arrow(const vector<vector <Point> >& arrows, vector<Point>& bi
 		}
 	}
 	biggest_arrow = arrows[max_square_idx];
-	//here -> gloval lists enroll!
-	points[max_square_idx*3].swap(square);
-	points[max_square_idx*3+1].swap(triangle);
-	points[max_square_idx*3+2].swap(triangle_large);
 	
 	
-	
-	
+	return max_square_idx;
 }
 ///////////////////////////////////////////////////////////////////////////////
 //return left:0, right:1
-int whichSide(vector<Point>& arrow)
+int whichSide(int idx)
 {
 	//how about slide station??
 	
 	printf("\nsquare: ");
-	for(int i=0;i<square.size();i++){
-		printf("(%lf,%lf)",square[i].first,square[i].second);
+	for(int i=0;i<square[idx].size();i++){
+		printf("(%lf,%lf)",square[idx][i].first,square[idx][i].second);
 	}
 	printf("\ntriangle: ");
-	for(int i=0;i<triangle.size();i++){
-		printf("(%lf,%lf)",triangle[i].first,triangle[i].second);
+	for(int i=0;i<triangle[idx].size();i++){
+		printf("(%lf,%lf)",triangle[idx][i].first,triangle[idx][i].second);
 	}
 	printf("\ntriangle large: ");
-	for(int i=0;i<triangle_large.size();i++){
-		printf("(%lf,%lf)",triangle_large[i].first,triangle_large[i].second);
+	for(int i=0;i<triangle_large[idx].size();i++){
+		printf("(%lf,%lf)",triangle_large[idx][i].first,triangle_large[idx][i].second);
 	}
 	
 	
 	//large triangle's y value > any squre's y value -> left (opencv's w is below direction)
 	//printf("tri large: %lf, squre first: %lf\n",triangle_large[0].first ,square[0].first);
-	if(triangle_large[0].first > square[0].first){
+	if(triangle_large[idx][0].first > square[idx][0].first){
 		return 1;
 	}else{
 		return 0;
@@ -162,10 +161,10 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 	Mat img = cv_bridge::toCvShare(msg, "bgr8")->image;
 	Mat img_origin = img.clone();
 	vector< vector< Point> > arrows;
-	vector< vector< pair<double,double> > > points;
-	find_arrows(img, arrows,points);
+	find_arrows(img, arrows);
 	vector<Point> largest_arrow;
-	find_largest_arrow(arrows, largest_arrow,points);
+	int idx = find_largest_arrow(arrows, largest_arrow);
+	printf("index: %d in %d\n",idx,arrows.size());
 	//draw largest arrow
 	if(largest_arrow.size() >0 ) {
 		printf("<<<<ARROW DETECTION>>>>\n");
@@ -181,7 +180,7 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 	knu_ros_team4::arrowDetecter msgAD;
 	
 	if(largest_arrow.size() >0 ) {
-		if(whichSide(largest_arrow)) {
+		if(whichSide(idx)) {
 			printf("\narrow direction is right\n");
 			msgAD.intAD = 0;
 		}
@@ -195,6 +194,7 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 	//clear
 	square.clear();
 	triangle.clear();
+	triangle_large.clear();
 	
 	return;
 }

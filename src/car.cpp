@@ -339,10 +339,13 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
    
    if(center_x2 > 700){
       baseCmd.angular.z = -0.1;
+      baseCmd.linear.x = 0.04;
    }else if(center_x2 < 580){
       baseCmd.angular.z = 0.1;
+      baseCmd.linear.x = 0.04;
    }else{
       baseCmd.angular.z = 0;
+      baseCmd.linear.x = 0.08;
    }
    pub.publish(baseCmd);
 
@@ -440,7 +443,7 @@ int main(int argc, char** argv)
    subAD = nh.subscribe("arrowDetecter",100,&arrowMessage);
    image_transport::Subscriber sub = it.subscribe("/raspicam_node/image", 1, &poseMessageReceived, ros::VoidPtr(), image_transport::TransportHints("compressed"));
 
-   baseCmd.linear.x = 0.03;
+   baseCmd.linear.x = 0.08;
    baseCmd.linear.y = 0;
    baseCmd.linear.z = 0;
    baseCmd.angular.z =0;
