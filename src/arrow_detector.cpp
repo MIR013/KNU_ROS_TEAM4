@@ -33,7 +33,7 @@ bool isInVector(vector<pair<double,double> > v, Point value){
 }
 ///////////////////////////////////////////////////////////////////////////////
 // find all od squares
-void find_arrows( Mat& image, vector< vector< Point> >& arrows)
+void find_arrows( Mat& image, vector< vector< Point> >& arrows, vector< vector< pair<double,double> > >&points)
 {
 	// blur will enhance edge detection
 	GaussianBlur(image, image, Size(5,5), 1 ,1);
@@ -85,9 +85,13 @@ void find_arrows( Mat& image, vector< vector< Point> >& arrows)
 		if (square_test.size()==4&& triangle_test.size() == 2 && triangle_large_test.size() == 1){ 
 			//check arrow delicately
 			arrows.push_back(approx);
-			square_test.swap(square);
-			triangle_test.swap(triangle);
-			triangle_large_test.swap(triangle_large);
+			
+			points.push_back(square);
+			//square_test.swap(square);
+			points.push_back(triangle);
+			//triangle_test.swap(triangle);
+			points.push_back(triangle_large);
+			//triangle_large_test.swap(triangle_large);
 		}
 		
 		
@@ -96,7 +100,7 @@ void find_arrows( Mat& image, vector< vector< Point> >& arrows)
 }
 ///////////////////////////////////////////////////////////////////////////////
 // find largest one!!
-void find_largest_arrow(const vector<vector <Point> >& arrows, vector<Point>& biggest_arrow) {
+void find_largest_arrow(const vector<vector <Point> >& arrows, vector<Point>& biggest_arrow, vector< vector< pair<double,double> > >&points) {
 	if (!arrows.size()) {
 		return;
 	}
@@ -113,6 +117,14 @@ void find_largest_arrow(const vector<vector <Point> >& arrows, vector<Point>& bi
 		}
 	}
 	biggest_arrow = arrows[max_square_idx];
+	//here -> gloval lists enroll!
+	points[max_square_idx*3].swap(square);
+	points[max_square_idx*3+1].swap(triangle);
+	points[max_square_idx*3+2].swap(triangle_large);
+	
+	
+	
+	
 }
 ///////////////////////////////////////////////////////////////////////////////
 //return left:0, right:1
@@ -150,9 +162,10 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 	Mat img = cv_bridge::toCvShare(msg, "bgr8")->image;
 	Mat img_origin = img.clone();
 	vector< vector< Point> > arrows;
-	find_arrows(img, arrows);
+	vector< vector< pair<double,double> > > points;
+	find_arrows(img, arrows,points);
 	vector<Point> largest_arrow;
-	find_largest_arrow(arrows, largest_arrow);
+	find_largest_arrow(arrows, largest_arrow,points);
 	//draw largest arrow
 	if(largest_arrow.size() >0 ) {
 		printf("<<<<ARROW DETECTION>>>>\n");
