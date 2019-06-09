@@ -1,21 +1,20 @@
-// 원본 코드  https://github.com/georgesung/road_lane_line_detection/blob/master/lane_lines.py
-// 수정 - webnautes
+// ?�본 코드  https://github.com/georgesung/road_lane_line_detection/blob/master/lane_lines.py
+// ?�정 - webnautes
 //
-// 필요한 라이브러리
-// OpenCV 3.x  http://opencv.org/releases.html
+// ?�요???�이브러�?// OpenCV 3.x  http://opencv.org/releases.html
 
-// 설치 방법 http://webnautes.tistory.com/1186
+// ?�치 방법 http://webnautes.tistory.com/1186
 
 //
 // GSL - GNU Scientific Library https://www.gnu.org/software/gsl/
-// 설치 방법 sudo apt-get install libgsl-dev
+// ?�치 방법 sudo apt-get install libgsl-dev
 //
-// 컴파일 
+// 컴파??
 
 // g++ main.cpp -o main $(pkg-config opencv --libs --cflags) -lgsl -lcblas
 
 //
-// 테스트 동영상 다운로드 
+// ?�스???�영???�운로드 
 
 // https://github.com/georgesung/road_lane_line_detection
 
@@ -44,7 +43,7 @@ geometry_msgs::Twist baseCmd;
 boost::mutex mutex;
 
 
-//Hough Transform 파라미터
+//Hough Transform ?�라미터
 float rho = 2; // distance resolution in pixels of the Hough grid
 float theta = 1 * CV_PI / 180; // angular resolution in radians of the Hough grid
 float hough_threshold = 15;    // minimum number of votes(intersections in Hough grid cell)
@@ -52,22 +51,22 @@ float minLineLength = 10; //minimum number of pixels making up a line
 float maxLineGap = 20;   //maximum gap in pixels between connectable line segments
 
 
-//Region - of - interest vertices, 관심 영역 범위 계산시 사용 
+//Region - of - interest vertices, 관???�역 범위 계산???�용 
 //We want a trapezoid shape, with bottom edge at the bottom of the image
 float trap_bottom_width = 0.85;  // width of bottom edge of trapezoid, expressed as percentage of image width
 float trap_top_width = 0.07;     // ditto for top edge of trapezoid
 float trap_height = 0.4;         // height of the trapezoid expressed as percentage of image height
 Mat img;
 
-//차선 색깔 범위 
-//SCALAR LOWER_WHITE = SCALAR(200, 200, 200); //흰색 차선 (RGB)
+//차선 ?�깔 범위 
+//SCALAR LOWER_WHITE = SCALAR(200, 200, 200); //?�색 차선 (RGB)
 //SCALAR UPPER_WHITE = SCALAR(255, 255, 255);
-//SCALAR LOWER_YELLOW = SCALAR(10, 100, 100); //노란색 차선 (HSV)
+//SCALAR LOWER_YELLOW = SCALAR(10, 100, 100); //?��???차선 (HSV)
 //SCALAR UPPER_YELLOW = SCALAR(40, 255, 255);
 
-Scalar lower_white = Scalar(0, 0, 0); //흰색 차선 (RGB)
+Scalar lower_white = Scalar(0, 0, 0); //?�색 차선 (RGB)
 Scalar upper_white = Scalar(10, 100, 100);
-Scalar lower_yellow = Scalar(0, 0, 0); //노란색 차선 (HSV)
+Scalar lower_yellow = Scalar(0, 0, 0); //?��???차선 (HSV)
 Scalar upper_yellow = Scalar(10, 100, 100);
 
 
@@ -332,22 +331,7 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
    center_x1 = (right_x1 + left_x1) / 2;
    center_x2 = (right_x2 + left_x2) / 2;
    
-   
-   
 
-   cout << "centerx : " << center_x2 << "y2 : " << y2 << endl;
-   
-   if(center_x2 > 700){
-      baseCmd.angular.z = -0.1;
-      baseCmd.linear.x = 0.04;
-   }else if(center_x2 < 580){
-      baseCmd.angular.z = 0.1;
-      baseCmd.linear.x = 0.04;
-   }else{
-      baseCmd.angular.z = 0;
-      baseCmd.linear.x = 0.08;
-   }
-   pub.publish(baseCmd);
 
    
    //Draw the right and left lines on image
@@ -357,7 +341,24 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
       line(img_line, Point(left_x1, y1), Point(left_x2, y2), Scalar(255, 0, 0), 10);
 
 }
+void movement(int center_x) {
+     float increment_ratio = fabs(center_x_x2 / 640 - 1); // 90% or 110% -> result : 0.1
+   
 
+   cout << "centerx : " << center_x << "y2 : " << y2 << endl;
+   
+   if(center_x > 700){
+      baseCmd.angular.z = -0.1;
+      baseCmd.linear.x = 0.04;
+   }else if(center_x < 580){
+      baseCmd.angular.z = 0.1;
+      baseCmd.linear.x = 0.04;
+   }else{
+      baseCmd.angular.z = 0;
+      baseCmd.linear.x = 0.08;
+   }
+   pub.publish(baseCmd);
+}
 
 void poseMessageReceived(const sensor_msgs::ImageConstPtr& msg) {
    char buf[256];
@@ -370,11 +371,11 @@ void poseMessageReceived(const sensor_msgs::ImageConstPtr& msg) {
    int height = img_bgr.size().height;
 
 
-   //2. 미리 정해둔 흰색, 노란색 범위 내에 있는 부분만 차선후보로 따로 저장함 
+   //2. 미리 ?�해???�색, ?��???범위 ?�에 ?�는 부분만 차선?�보�??�로 ?�?�함 
    Mat img_filtered;
    filter_colors(img_bgr, img_filtered);
 
-   //3. 그레이스케일 영상으로 변환하여 에지 성분을 추출
+   //3. 그레?�스케???�상?�로 변?�하???��? ?�분??추출
    cvtColor(img_filtered, img_gray, COLOR_BGR2GRAY);
    GaussianBlur(img_gray, img_gray, Size(3, 3), 0, 0);
    Canny(img_gray, img_edges, 50, 150);
@@ -392,32 +393,31 @@ void poseMessageReceived(const sensor_msgs::ImageConstPtr& msg) {
    points[3] = Point(width - (width * (1 - trap_bottom_width)) / 2, height);
 
 
-   //4. 차선 검출할 영역을 제한함(진행방향 바닥에 존재하는 차선으로 한정)
+   //4. 차선 검출할 ?�역???�한??진행방향 바닥??존재?�는 차선?�로 ?�정)
    img_edges = region_of_interest(img_edges, points);
 
 
    UMat uImage_edges;
    img_edges.copyTo(uImage_edges);
 
-   //5. 직선 성분을 추출(각 직선의 시작좌표와 끝좌표를 계산함)
+   //5. 직선 ?�분??추출(�?직선???�작좌표?� ?�좌?��? 계산??
    vector<Vec4i> lines;
    HoughLinesP(uImage_edges, lines, rho, theta, hough_threshold, minLineLength, maxLineGap);
 
 
 
 
-   //6. 5번에서 추출한 직선성분으로부터 좌우 차선에 있을 가능성있는 직선들만 따로 뽑아서
-   //좌우 각각 하나씩 직선을 계산함 (Linear Least-Squares Fitting)
+   //6. 5번에??추출??직선?�분?�로부??좌우 차선???�을 가?�성?�는 직선?�만 ?�로 뽑아??   //좌우 각각 ?�나??직선??계산??(Linear Least-Squares Fitting)
    Mat img_line = Mat::zeros(img_bgr.rows, img_bgr.cols, CV_8UC3);
    draw_line(img_line, lines);
 
 
-   //7. 원본 영상에 6번의 직선을 같이 보여줌 
+   //7. ?�본 ?�상??6번의 직선??같이 보여�?
    addWeighted(img_bgr, 0.8, img_line, 1.0, 0.0, img_annotated);
 
    
 /*
-   //9. 결과를 화면에 보여줌 
+   //9. 결과�??�면??보여�?
    Mat img_result;
    resize(img_annotated, img_annotated, Size(width*0.7, height*0.7));
    resize(img_edges, img_edges, Size(width*0.7, height*0.7));

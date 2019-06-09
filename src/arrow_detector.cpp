@@ -12,7 +12,6 @@ using namespace std;
 ///////////////////////////////////////////////////////////////////////////////
 vector<vector< pair<double,double> > > square; //90 degree == 270 degree (0.1 radian)
 vector<vector< pair<double,double> > > triangle; // 0.4 radian, 2
-vector<vector< pair<double,double> > > triangle_large; // 0.8 radian, 1
 ros::Publisher pub;
 ///////////////////////////////////////////////////////////////////////////////
 //angle between pt1, pt2 and pt0 -> pt0 is middle
@@ -51,9 +50,6 @@ void find_arrows( Mat& image, vector< vector< Point> >& arrows)
 	for (size_t i = 0; i < contours.size(); i++)
 	{
 	
-		vector< pair<double,double> > square_test;
-		vector< pair<double,double> > triangle_test;
-		vector< pair<double,double> > triangle_large_test;
 	
 		approxPolyDP( Mat(contours[i]), approx, arcLength( Mat(contours[i]), true)*0.02, true);
 		
@@ -61,37 +57,54 @@ void find_arrows( Mat& image, vector< vector< Point> >& arrows)
 		// && isContourConvex( Mat(approx))
 		if (approx.size() == 7 && fabs(contourArea( Mat(approx))) > 5000 )
 		{
-			printf("\n------------------\n");
+		
+			//printf("approx size is %d\n",approx.size());
+			vector< pair<double,double> > square_test;
+			vector< pair<double,double> > triangle_test;
+			vector< pair<double,double> > triangle_large_test;
+
+			////////////////////////////
 			double maxCosine = 0;
-			for (int j = 2; j <= 8; j++)//why 8? - last-first edge check
+			for (int j = 2; j < 8; j++)//why 8? - last-first edge check
 			{
 				double cosine = fabs(angle(approx[j%7], approx[j-2], approx[j-1]));
 				//register points
 				if(cosine<0.20){ //not minus value
-					printf("cosine sq: %lf ",cosine); 	
+					//printf("<<square>>");
+					//printf("cosine sq: %lf ",cosine); 	
+					//printf("(%d,%d),(%d,%d),(%d,%d)\n",approx[j%7].x,approx[j%7].y,approx[j-2].x,approx[j-2].y,approx[j-1].x,approx[j-1].y);
 					if(!isInVector(square_test,approx[j-1])) square_test.push_back(make_pair(approx[j-1].x,approx[j-1].y));	
 				}
-				else if(cosine>0.35 && cosine<0.58){//triangle small angles
-					printf("cosine tri: %lf ",cosine); 
+				else if(cosine>0.35 && cosine<0.58){//triangle angles
+					//printf("<<triangle>>");
+					//printf("cosine tri: %lf ",cosine); 
+					//printf("(%d,%d),(%d,%d),(%d,%d)\n",approx[j%7].x,approx[j%7].y,approx[j-2].x,approx[j-2].y,approx[j-1].x,approx[j-1].y);
 					if(!isInVector(triangle_test,approx[j-1])) triangle_test.push_back(make_pair(approx[j-1].x,approx[j-1].y));
 				}
-				else if(cosine>0.78){// triangle large angle
-					printf("cosine tri large: %lf ",cosine); 
-					if(!isInVector(triangle_large_test,approx[j-1])) triangle_large_test.push_back(make_pair(approx[j-1].x,approx[j-1].y));
-				}
 			}
-			printf("\n------------------\n");
+			/////////////////////////
+				double cosine = fabs(angle(approx[1], approx[6], approx[0]));
+				if(cosine<0.20){ //not minus value
+					//printf("<<square>>");
+					//printf("cosine sq: %lf ",cosine); 	
+					//printf("(%d,%d),(%d,%d),(%d,%d)\n",approx[1].x,approx[1].y,approx[6].x,approx[6].y,approx[0].x,approx[0].y);
+					if(!isInVector(square_test,approx[0])) square_test.push_back(make_pair(approx[0].x,approx[0].y));	
+				}
+				else if(cosine>0.35 && cosine<0.58){//triangle small angles
+					//printf("<<triangle>>");
+					//printf("cosine tri: %lf ",cosine); 
+					//printf("(%d,%d),(%d,%d),(%d,%d)\n",approx[1].x,approx[1].y,approx[6].x,approx[6].y,approx[0].x,approx[0].y);
+					if(!isInVector(triangle_test,approx[0])) triangle_test.push_back(make_pair(approx[0].x,approx[0].y));
+				}
+			
 			//4 squre, 3 triangle angle == arrow
-			if (square_test.size()==4 && triangle_test.size() == 2 && triangle_large_test.size() == 1){ 
+			if (square_test.size()==4 && triangle_test.size() == 3){ 
 				//check arrow delicately
-			
-			
 
 				arrows.push_back(approx);
 			
 				square.push_back(square_test);
 				triangle.push_back(triangle_test);
-				triangle_large.push_back(triangle_large_test);
 				
 			}
 
@@ -139,15 +152,19 @@ int whichSide(int idx)
 	for(int i=0;i<triangle[idx].size();i++){
 		printf("(%lf,%lf)",triangle[idx][i].first,triangle[idx][i].second);
 	}
-	printf("\ntriangle large: ");
-	for(int i=0;i<triangle_large[idx].size();i++){
-		printf("(%lf,%lf)",triangle_large[idx][i].first,triangle_large[idx][i].second);
+
+	//was not similar y triangle
+	int findex=0;
+	if(fabs(triangle[idx][0].first-triangle[idx][1].first)<20){
+		findex = 2;
+	}else if(fabs(triangle[idx][0].first-triangle[idx][2].first)<20){
+		findex = 1;
+	}else{
+		findex = 0;
 	}
 	
-	
-	//large triangle's y value > any squre's y value -> left (opencv's w is below direction)
-	//printf("tri large: %lf, squre first: %lf\n",triangle_large[0].first ,square[0].first);
-	if(triangle_large[idx][0].first > square[idx][0].first){
+	printf("arrow poing is (%lf, %lf)",triangle[idx][findex].first,triangle[idx][findex].second);
+	if(triangle[idx][findex].first > square[idx][0].first){
 		return 1;
 	}else{
 		return 0;
@@ -164,7 +181,7 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 	find_arrows(img, arrows);
 	vector<Point> largest_arrow;
 	int idx = find_largest_arrow(arrows, largest_arrow);
-	printf("index: %d in %d\n",idx,arrows.size());
+	//printf("index: %d in %d\n",idx,arrows.size());
 	//draw largest arrow
 	if(largest_arrow.size() >0 ) {
 		printf("<<<<ARROW DETECTION>>>>\n");
@@ -194,7 +211,6 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 	//clear
 	square.clear();
 	triangle.clear();
-	triangle_large.clear();
 	
 	return;
 }
