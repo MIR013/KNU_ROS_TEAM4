@@ -3,6 +3,7 @@
 #include <image_transport/image_transport.h>
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
+#include <knu_ros_team4/arrowDetecter.h>
 #include <iomanip>
 #include <utility>
 
@@ -12,6 +13,7 @@ using namespace std;
 vector< pair<double,double> > square; //90 degree == 270 degree (0.1 radian)
 vector< pair<double,double> > triangle; // 0.4 radian, 2
 vector< pair<double,double> > triangle_large; // 0.8 radian, 1
+ros::Publisher pub;
 ///////////////////////////////////////////////////////////////////////////////
 //angle between pt1, pt2 and pt0 -> pt0 is middle
 double angle( Point pt1, Point pt2, Point pt0 ) {
@@ -158,16 +160,25 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 			line(img, largest_arrow[i], largest_arrow[(i+1)%7], Scalar(0, 0, 255), 3, CV_AA);
 		}
 	}
-	imshow("img_origin",img_origin);
+	//imshow("img_origin",img_origin);
 	imshow("arrows", img);
 	waitKey(1);//all time
 	
 	//check direction
+	knu_ros_team4::arrowDetecter msgAD;
+	
 	if(largest_arrow.size() >0 ) {
-		if(whichSide(largest_arrow)) printf("\narrow direction is right\n");
-		else printf("\narrow direction is left\n");
+		if(whichSide(largest_arrow)) {
+			printf("\narrow direction is right\n");
+			msgAD.intAD = 0;
+		}
+		else {
+			printf("\narrow direction is left\n");
+			msgAD.intAD = 1;
+		}
+		pub.publish(msgAD);
 	}
-
+	
 	//clear
 	square.clear();
 	triangle.clear();
@@ -183,6 +194,8 @@ int main(int argc, char **argv)
 	image_transport::ImageTransport it(nh);
 	// Create a subscriber object
 	image_transport::Subscriber subRGB = it.subscribe("/raspicam_node/image", 1, &poseMessageReceivedRGB, ros::VoidPtr(), image_transport::TransportHints("compressed"));
+	
+	pub = nh.advertise<knu_ros_team4::arrowDetecter>("arrowDetecter",100);
 	// Let ROS take over
 	ros::spin();
 	return 0;

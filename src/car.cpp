@@ -19,7 +19,11 @@
 
 // https://github.com/georgesung/road_lane_line_detection
 
-
+#include <nav_msgs/Odometry.h>
+#include <tf/tf.h>
+#include <iomanip>
+#include <boost/thread/mutex.hpp>
+#include <ros/ros.h>
 #include <opencv2/opencv.hpp>  
 #include <opencv2/imgproc.hpp>
 #include <gsl/gsl_fit.h>
@@ -27,11 +31,17 @@
 #include <image_transport/image_transport.h>
 #include <iostream>  
 #include <cv_bridge/cv_bridge.h>
+#include <knu_ros_team4/arrowDetecter.h>
+
 
 
 using namespace cv;
 using namespace std;
 
+ros::Publisher pub;
+ros::Subscriber subAD;
+geometry_msgs::Twist baseCmd;
+boost::mutex mutex;
 
 
 //Hough Transform 파라미터
@@ -50,10 +60,15 @@ float trap_height = 0.4;         // height of the trapezoid expressed as percent
 Mat img;
 
 //차선 색깔 범위 
-Scalar lower_white = Scalar(200, 200, 200); //흰색 차선 (RGB)
-Scalar upper_white = Scalar(255, 255, 255);
-Scalar lower_yellow = Scalar(10, 100, 100); //노란색 차선 (HSV)
-Scalar upper_yellow = Scalar(40, 255, 255);
+//SCALAR LOWER_WHITE = SCALAR(200, 200, 200); //흰색 차선 (RGB)
+//SCALAR UPPER_WHITE = SCALAR(255, 255, 255);
+//SCALAR LOWER_YELLOW = SCALAR(10, 100, 100); //노란색 차선 (HSV)
+//SCALAR UPPER_YELLOW = SCALAR(40, 255, 255);
+
+Scalar lower_white = Scalar(0, 0, 0); //흰색 차선 (RGB)
+Scalar upper_white = Scalar(10, 100, 100);
+Scalar lower_yellow = Scalar(0, 0, 0); //노란색 차선 (HSV)
+Scalar upper_yellow = Scalar(10, 100, 100);
 
 
 
@@ -312,7 +327,26 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
    left_x1 = int(left_x1);
    left_x2 = int(left_x2);
 
+   int center_x1, center_x2;
 
+   center_x1 = (right_x1 + left_x1) / 2;
+   center_x2 = (right_x2 + left_x2) / 2;
+   
+   
+   
+
+   cout << "centerx : " << center_x2 << "y2 : " << y2 << endl;
+   
+   if(center_x2 > 700){
+      baseCmd.angular.z = -0.1;
+   }else if(center_x2 < 580){
+      baseCmd.angular.z = 0.1;
+   }else{
+      baseCmd.angular.z = 0;
+   }
+   pub.publish(baseCmd);
+
+   
    //Draw the right and left lines on image
    if (draw_right)
       line(img_line, Point(right_x1, y1), Point(right_x2, y2), Scalar(255, 0, 0), 10);
@@ -378,7 +412,8 @@ void poseMessageReceived(const sensor_msgs::ImageConstPtr& msg) {
    //7. 원본 영상에 6번의 직선을 같이 보여줌 
    addWeighted(img_bgr, 0.8, img_line, 1.0, 0.0, img_annotated);
 
-
+   
+/*
    //9. 결과를 화면에 보여줌 
    Mat img_result;
    resize(img_annotated, img_annotated, Size(width*0.7, height*0.7));
@@ -388,18 +423,31 @@ void poseMessageReceived(const sensor_msgs::ImageConstPtr& msg) {
    imshow("video", img_result);
 
    waitKey(30); 
+*/
 }
-
+void
+arrowMessage(const knu_ros_team4::arrowDetecter &msg){
+	ROS_INFO("Arrow Detecter : %d", msg.intAD);
+}
 int main(int argc, char** argv)
 {
    ros::init(argc, argv, "lane_driving");
-   ros::NodeHandle nh;
+   ros::NodeHandle nh, nhp;
    image_transport::ImageTransport it(nh);
 
+
+   pub = nhp.advertise<geometry_msgs::Twist>("/cmd_vel", 100);
+   subAD = nh.subscribe("arrowDetecter",100,&arrowMessage);
    image_transport::Subscriber sub = it.subscribe("/raspicam_node/image", 1, &poseMessageReceived, ros::VoidPtr(), image_transport::TransportHints("compressed"));
 
-   ros::spin();
+   baseCmd.linear.x = 0.03;
+   baseCmd.linear.y = 0;
+   baseCmd.linear.z = 0;
+   baseCmd.angular.z =0;
+   pub.publish(baseCmd);
+   
 
+   ros::spin();
 
 
    return 0;

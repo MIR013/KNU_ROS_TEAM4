@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   message_generation
   image_transport
+  cmake_modules
 )
 
 ## System dependencies are found with CMake's conventions
@@ -50,11 +51,12 @@ find_package(GSL REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+ add_message_files(
+
+   FILES
+   arrowDetecter.msg
+
+ )
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -142,7 +144,7 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/knu_ros_team4_node.cpp)
 add_executable(arrow_detector src/arrow_detector.cpp)
-#add_executable(lane_driving src/car.cpp)
+add_executable(lane_driving src/car.cpp)
 add_executable(ros_hw3_2016111813 src/ros_hw3_2016111813.cpp)
 
 ## Rename C++ executable without prefix
@@ -155,7 +157,7 @@ add_executable(ros_hw3_2016111813 src/ros_hw3_2016111813.cpp)
 ## same as for the library above
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(arrow_detector knu_ros_team4_generate_messages_cpp)
-#add_dependencies(lane_driving knu_ros_team4_generate_messages_cpp)
+add_dependencies(lane_driving knu_ros_team4_generate_messages_cpp)
 add_dependencies(ros_hw3_2016111813 knu_ros_team4_generate_messages_cpp)
 
 
@@ -164,7 +166,7 @@ add_dependencies(ros_hw3_2016111813 knu_ros_team4_generate_messages_cpp)
 #   ${catkin_LIBRARIES}
 # )
 target_link_libraries(arrow_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} )
-#target_link_libraries(lane_driving ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${gsl_LIBRARIES})
+target_link_libraries(lane_driving ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${GSL_LIBRARIES})
 target_link_libraries(ros_hw3_2016111813 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 
