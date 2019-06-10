@@ -57,6 +57,10 @@ float trap_bottom_width = 0.85;  // width of bottom edge of trapezoid, expressed
 float trap_top_width = 0.07;     // ditto for top edge of trapezoid
 float trap_height = 0.4;         // height of the trapezoid expressed as percentage of image height
 
+int camera_width = 640;
+int camera_height = 480;
+int pre_center_x;
+
 //ì°¨ì„  ?‰ê¹” ë²”ìœ„ 
 //SCALAR LOWER_WHITE = SCALAR(200, 200, 200); //?°ìƒ‰ ì°¨ì„  (RGB)
 //SCALAR UPPER_WHITE = SCALAR(255, 255, 255);
@@ -141,43 +145,49 @@ void filter_colors(Mat _img_bgr, Mat &img_filtered)
    yellow_image.release();
 }
 
-void move_robot(int center_x1, int center_x2) {
-   float increment_ratio = fabs(center_x1 / 640 - 1); // 90% or 110% -> result : 0.1
-   if(increment_ratio > 0.4) {
-     increment_ratio = 0.3;
+void move_robot(int center_x1, float left_slope, float right_slope) {
+   float increment_ratio = fabs(center_x1 / ((camera_width / 2) - 1)); // 90% or 110% -> result : 0.1
+
+   cout << "centerx : " << center_x1 << ", left_slope : " << left_slope << ", right_slpe : "
+<< right_slope << endl;
+   if(increment_ratio > 1) {
+	increment_ratio = 0.9;
    }
-   cout << "centerx : " << center_x1 << endl;
-   
-   if(center_x1 > 700){
+   if(center_x1 > camera_width / 2 + (camera_width / 20)){
       cout << "Turn Left" << endl;
-      if(baseCmd.angular.z == 0){
       baseCmd.angular.z = 0.1 * (increment_ratio + 1);
+
+      if(baseCmd.angular.z < 0){
+		baseCmd.angular.z *= -1;
       }
-      else{
-      cout << "More !!! Turn Left" << endl;
-        baseCmd.angular.z *= increment_ratio;
-      }
+
       baseCmd.linear.x = 0.03;
-   }else if(center_x1 < 580){
+
+   }
+   else if(center_x1 < camera_width / 2 - (camera_width / 20)){
        cout << "Turn Right" << endl;
-       if(baseCmd.angular.z == 0){
-          baseCmd.angular.z = -0.1 * (increment_ratio + 1);
+       baseCmd.angular.z = -0.1 * (increment_ratio + 1);
+       if(baseCmd.angular.z > 0){
+		baseCmd.angular.z *= -1;
        }
-       else{
-          cout << "More !!! Turn Right" << endl;
-          baseCmd.angular.z *= increment_ratio;
-      }
       baseCmd.linear.x = 0.03;
    }else{
       baseCmd.angular.z = 0;
-      baseCmd.linear.x = 0.06;
+      baseCmd.linear.x = 0.03;
    }
+
+   if(baseCmd.angular.z > 0.4) {
+     baseCmd.angular.z = 0.3;
+   }
+
+   cout << "--------angular speed = " << baseCmd.angular.z << endl;
    pub.publish(baseCmd);
 }
 
 
 void draw_line(Mat &img_line, vector<Vec4i> lines)
 {
+   cout << " in draw_line & lines.size : " << lines.size() << endl;
    if (lines.size() == 0) return;
 
    /*
@@ -379,30 +389,36 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
      right_x1 = right_x2;
      right_x2 = temp;
    }
+
+   float left_slope = -1;
+   float right_slope = -1;
    
+   if(left_x1 > 0) {
+	left_slope = (y2 - y1) / (float)(left_x2 - left_x1);
+	}
+   if(right_x1 > 0){
+	right_slope = (y2 - y1) / (float)(right_x2 - right_x1);
+	}
+
    cout << "left_x1=" << left_x1 << ", left_x2=" << left_x2 << ", right_x1=" << right_x1 << ", right_x2=" << right_x2 << endl;
    
-   int center_x1, center_x2;
+   int center_x1;
 
-   if(left_x1 > 0 && left_x2 > 0 && right_x1 > 0 && right_x2 > 0 && left_x1 < 1280 && left_x2 < 1280 && right_x1 < 1280 && right_x2 < 1280) {
+   if(left_x1 > 0 && left_x2 > 0 && right_x1 > 0 && right_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width && right_x1 < camera_width && right_x2 < camera_width) {
       center_x1 = (right_x1 + left_x1) / 2;
-      center_x2 = (right_x2 + left_x2) / 2;
-   } else if((left_x1 < 0 || left_x2 < 0) && (right_x1 > 0 && right_x2 > 0 && right_x1 < 1280 && right_x2 < 1280)) { // ¿ÞÂÊ¼± ¾Èº¸ÀÏ¶§ : ÁÂÈ¸
+   } else if((left_x1 < 0 || left_x2 < 0) && (right_x1 > 0 && right_x2 > 0 && right_x1 < camera_width && right_x2 < camera_width)) { // ¿ÞÂÊ¼± ¾Èº¸ÀÏ¶§ : ÁÂÈ¸
       cout << "Calculate : Turn Left" << endl;
-      center_x1 = (right_x1 + 640) / 2;
-      center_x2 = (right_x1 + 640) / 2;
-   } else if((right_x1 < 0 || right_x2 < 0) && (left_x1 > 0 && left_x2 > 0 && left_x1 < 1280 && left_x2 < 1280)) { // ¿À¸¥ÂÊ¼± ¾Èº¸ÀÏ¶§:¿ìÈ¸
+      center_x1 = (right_x1 + camera_width / 2) / 2;
+   } else if((right_x1 < 0 || right_x2 < 0) && (left_x1 > 0 && left_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width)) { // ¿À¸¥ÂÊ¼± ¾Èº¸ÀÏ¶§:¿ìÈ¸
       cout << "Calculate : Turn Right" << endl;
-      center_x1 = (left_x1 + 640) / 2;
-      center_x2 = (left_x1 + 640) / 2;
+      center_x1 = (left_x1 + camera_width / 2) / 2;
    } else {
       cout << "Calculate : Except!!" << endl;
-      center_x1 = 640;
-      center_x2 = 640;
+      center_x1 = pre_center_x;
    }
 
-   move_robot(center_x1, center_x2);
-   
+   move_robot(center_x1, left_slope, right_slope);
+   pre_center_x = center_x1;   
    
    //Draw the right and left lines on image
    
@@ -410,8 +426,7 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
       line(img_line, Point(right_x1, y1), Point(right_x2, y2), Scalar(255, 0, 0), 10);
    if (draw_left)
       line(img_line, Point(left_x1, y1), Point(left_x2, y2), Scalar(255, 0, 0), 10);
-   if (draw_right && draw_left)
-      line(img_line, Point(center_x2, y2), Point(center_x1, y1), Scalar(0, 0, 255), 10);
+ 
 
     left_x1 = left_x2 = right_x1 = right_x2 = -9999;
 }
@@ -419,7 +434,7 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
 
 void calculate(){
 
-  cout << "Camera Sibal" << endl;
+   cout << "i'm calculate" << endl;
   
    char buf[256];
    
@@ -500,8 +515,8 @@ void poseMessageReceived(const sensor_msgs::ImageConstPtr& msg) {
     img = cv_bridge::toCvShare(msg, "bgr8")->image;
     
   }mutex.unlock();
-  cout << "recieve" << endl;
   
+    cout << "in callback" << endl;
     calculate();
   
 }
@@ -518,13 +533,10 @@ int main(int argc, char** argv)
 
   while(ros::ok()){
     cout << "main" << endl;
+    baseCmd.linear.x = 0.01;
+    pub.publish(baseCmd);
      ros::spin();
   }
-   baseCmd.linear.x = 0.08;
-   baseCmd.linear.y = 0;
-   baseCmd.linear.z = 0;
-   baseCmd.angular.z =0;
-   pub.publish(baseCmd);
 
 
 
