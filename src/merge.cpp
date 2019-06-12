@@ -60,7 +60,7 @@ float trap_height = 0.4;         // height of the trapezoid expressed as percent
 int camera_width = 900;
 int camera_height = 600;
 int pre_center_x;
-
+int arrow = -1;
 //차선 ?�깔 범위 
 //SCALAR LOWER_WHITE = SCALAR(200, 200, 200); //?�색 차선 (RGB)
 //SCALAR UPPER_WHITE = SCALAR(255, 255, 255);
@@ -155,33 +155,49 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
    }
    if(center_x1 > camera_width / 2 + (camera_width / 10)){
       cout << "Turn Left" << endl;
+	baseCmd.linear.x = 0.06;
+	baseCmd.angular.z = 0;
+       for(int i = 0; i < 100; i++) {
+	   pub.publish(baseCmd);
+	}
       baseCmd.angular.z = 0.2 * (increment_ratio + 1);
 
       if(baseCmd.angular.z < 0){
 		baseCmd.angular.z *= -1;
       }
 
-      baseCmd.linear.x = 0.06;
-
    }
    else if(center_x1 < camera_width / 2 - (camera_width / 10)){
        cout << "Turn Right" << endl;
+	baseCmd.linear.x = 0.06;
+	baseCmd.angular.z = 0;
+       for(int i = 0; i < 100; i++) {
+	   pub.publish(baseCmd);
+	}
        baseCmd.angular.z = -0.2 * (increment_ratio + 1);
        if(baseCmd.angular.z > 0){
 		baseCmd.angular.z *= -1;
        }
-      baseCmd.linear.x = 0.06;
+      
    }else{
       baseCmd.angular.z = 0;
       baseCmd.linear.x = 0.06;
    }
-
+   // If angular value is too high, limit this.
    if(baseCmd.angular.z > 0.4) {
      baseCmd.angular.z = 0.3;
    }
 
    cout << "--------angular speed = " << baseCmd.angular.z << endl;
-
+	int flag = 0;
+   if(arrow == 1) { // right arrow
+	baseCmd.angular.z = -0.75;
+	flag = 1;
+   } else if(arrow == 0) { //left arrow
+	baseCmd.angular.z = 0.75;
+	flag = 1;
+   }
+   
    pub.publish(baseCmd);
 }
 
@@ -508,6 +524,7 @@ void calculate(){
 void
 arrowMessage(const knu_ros_team4::arrowDetecter &msg){
 	ROS_INFO("Arrow Detecter : %d", msg.intAD);
+	arrow = msg.intAD;
 }
 
 
@@ -529,7 +546,7 @@ int main(int argc, char** argv)
 
 
    pub = nhp.advertise<geometry_msgs::Twist>("/cmd_vel", 100);
-   //subAD = nh.subscribe("arrowDetecter",100,&arrowMessage);
+   subAD = nh.subscribe("arrowDetecter",100,&arrowMessage);
    image_transport::Subscriber sub = it.subscribe("/raspicam_node/image", 100, &poseMessageReceived, ros::VoidPtr(), image_transport::TransportHints("compressed"));
 
   while(ros::ok()){

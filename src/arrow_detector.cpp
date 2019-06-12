@@ -190,8 +190,8 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 		}
 	}
 	//imshow("img_origin",img_origin);
-	imshow("arrows", img);
-	waitKey(1);//all time
+	//imshow("arrows", img);
+	//waitKey(1);//all time
 	
 	//check direction
 	knu_ros_team4::arrowDetecter msgAD;
@@ -199,13 +199,22 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 	if(largest_arrow.size() >0 ) {
 		if(whichSide(idx)) {
 			printf("\narrow direction is right\n");
-			msgAD.intAD = 0;
+			msgAD.intAD = 1; //right
 		}
 		else {
 			printf("\narrow direction is left\n");
-			msgAD.intAD = 1;
+			msgAD.intAD = 0; //left
 		}
-		pub.publish(msgAD);
+	}else{
+     printf("arrow not detected\n");
+     msgAD.intAD = -1; // no arrow
+   }
+	if(msgAD.intAD != -1) {
+		for(int i = 0; i < 50; i++) {
+			pub.publish(msgAD);
+		}
+	} else {
+	pub.publish(msgAD);
 	}
 	
 	//clear
