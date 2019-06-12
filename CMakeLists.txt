@@ -146,7 +146,11 @@ include_directories(
 add_executable(arrow_detector src/arrow_detector.cpp)
 add_executable(lane_driving src/car.cpp)
 add_executable(lane_driving410 src/car410.cpp)
+<<<<<<< HEAD
 add_executable(merge src/merge.cpp)
+=======
+add_executable(obstacle_detection src/obstacle_detection.cpp)
+>>>>>>> bad4ab92ff1036a84dda84838fb296b457b1f860
 #add_executable(ros_hw3_2016111813 src/ros_hw3_2016111813.cpp)
 
 ## Rename C++ executable without prefix
@@ -161,7 +165,11 @@ add_executable(merge src/merge.cpp)
 add_dependencies(arrow_detector knu_ros_team4_generate_messages_cpp)
 add_dependencies(lane_driving knu_ros_team4_generate_messages_cpp)
 add_dependencies(lane_driving410 knu_ros_team4_generate_messages_cpp)
+<<<<<<< HEAD
 add_dependencies(merge knu_ros_team4_generate_messages_cpp)
+=======
+add_dependencies(obstacle_detection knu_ros_team4_generate_messages_cpp)
+>>>>>>> bad4ab92ff1036a84dda84838fb296b457b1f860
 #add_dependencies(ros_hw3_2016111813 knu_ros_team4_generate_messages_cpp)
 
 
@@ -172,7 +180,11 @@ add_dependencies(merge knu_ros_team4_generate_messages_cpp)
 target_link_libraries(arrow_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} )
 target_link_libraries(lane_driving ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${GSL_LIBRARIES})
 target_link_libraries(lane_driving410 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${GSL_LIBRARIES})
+<<<<<<< HEAD
 target_link_libraries(merge ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${GSL_LIBRARIES})
+=======
+target_link_libraries(obstacle_detection ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+>>>>>>> bad4ab92ff1036a84dda84838fb296b457b1f860
 #target_link_libraries(ros_hw3_2016111813 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 
