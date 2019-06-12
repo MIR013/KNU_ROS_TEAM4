@@ -1,23 +1,3 @@
-// ?�본 코드  https://github.com/georgesung/road_lane_line_detection/blob/master/lane_lines.py
-// ?�정 - webnautes
-//
-// ?�요???�이브러�?// OpenCV 3.x  http://opencv.org/releases.html
-
-// ?�치 방법 http://webnautes.tistory.com/1186
-
-//
-// GSL - GNU Scientific Library https://www.gnu.org/software/gsl/
-// ?�치 방법 sudo apt-get install libgsl-dev
-//
-// 컴파??
-
-// g++ main.cpp -o main $(pkg-config opencv --libs --cflags) -lgsl -lcblas
-
-//
-// ?�스???�영???�운로드 
-
-// https://github.com/georgesung/road_lane_line_detection
-
 #include <nav_msgs/Odometry.h>
 #include <tf/tf.h>
 #include <iomanip>
@@ -43,7 +23,7 @@ geometry_msgs::Twist baseCmd;
 boost::mutex mutex;
 
 
-//Hough Transform ?�라미터
+//Hough Transform
 float rho = 2; // distance resolution in pixels of the Hough grid
 float theta = 1 * CV_PI / 180; // angular resolution in radians of the Hough grid
 float hough_threshold = 15;    // minimum number of votes(intersections in Hough grid cell)
@@ -51,7 +31,7 @@ float minLineLength = 10; //minimum number of pixels making up a line
 float maxLineGap = 20;   //maximum gap in pixels between connectable line segments
 
 
-//Region - of - interest vertices, 관???�역 범위 계산???�용 
+//Region - of - interest vertices
 //We want a trapezoid shape, with bottom edge at the bottom of the image
 float trap_bottom_width = 0.85;  // width of bottom edge of trapezoid, expressed as percentage of image width
 float trap_top_width = 0.07;     // ditto for top edge of trapezoid
@@ -61,15 +41,14 @@ int camera_width = 900;
 int camera_height = 600;
 int pre_center_x;
 int arrow = -1;
-//차선 ?�깔 범위 
-//SCALAR LOWER_WHITE = SCALAR(200, 200, 200); //?�색 차선 (RGB)
+//SCALAR LOWER_WHITE = SCALAR(200, 200, 200); //(RGB)
 //SCALAR UPPER_WHITE = SCALAR(255, 255, 255);
-//SCALAR LOWER_YELLOW = SCALAR(10, 100, 100); //?��???차선 (HSV)
+//SCALAR LOWER_YELLOW = SCALAR(10, 100, 100); //(HSV)
 //SCALAR UPPER_YELLOW = SCALAR(40, 255, 255);
 
-Scalar lower_white = Scalar(0, 0, 0); //?�색 차선 (RGB)
+Scalar lower_white = Scalar(0, 0, 0); //(RGB)
 Scalar upper_white = Scalar(10, 100, 100);
-Scalar lower_yellow = Scalar(0, 0, 0); //?��???차선 (HSV)
+Scalar lower_yellow = Scalar(0, 0, 0); //(HSV)
 Scalar upper_yellow = Scalar(10, 100, 100);
 
 Mat img, img_masked, img_mask;
@@ -150,9 +129,13 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
 
    cout << "centerx : " << center_x1 << ", left_slope : " << left_slope << ", right_slpe : "
 << right_slope << endl;
+	
+   // 계산한 직선의 기울기의 비율이 너무크면 최대값으로 고
    if(increment_ratio > 1) {
 	increment_ratio = 0.9;
    }
+
+   // 두 차선의 중심이 오른쪽으로 가면 왼쪽으로 회
    if(center_x1 > camera_width / 2 + (camera_width / 10)){
       cout << "Turn Left" << endl;
 	baseCmd.linear.x = 0.06;
@@ -167,6 +150,7 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
       }
 
    }
+   // 두 차선의 중심이 왼쪽으로 가면 오른쪽으로 회전
    else if(center_x1 < camera_width / 2 - (camera_width / 10)){
        cout << "Turn Right" << endl;
 	baseCmd.linear.x = 0.06;
@@ -183,13 +167,16 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
       baseCmd.angular.z = 0;
       baseCmd.linear.x = 0.06;
    }
-   // If angular value is too high, limit this.
+   // 회전속도가 혹시 너무 높아지면 한계값으로 설
    if(baseCmd.angular.z > 0.4) {
      baseCmd.angular.z = 0.3;
    }
 
-   cout << "--------angular speed = " << baseCmd.angular.z << endl;
-	int flag = 0;
+   cout << "--------angular speed = " << baseCmd.angular.z << endl
+	   
+   // 수진이 코드 합친것
+   // Arrow 발견되면 flag값을 1로 변경후 회전속도 설
+   int flag = 0;
    if(arrow == 1) { // right arrow
 	baseCmd.angular.z = -0.75;
 	flag = 1;
@@ -198,6 +185,14 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
 	flag = 1;
    }
    
+   // 정우형 코드 부분
+   int obstacle_flag = 0;
+   if(obstacle_flag == 1) { 
+	// 앞의 차량 발견되면?
+   } else if(obstacle_flag == 0) { 
+	// 그냥 정상주
+   }
+
    pub.publish(baseCmd);
 }
 
@@ -206,23 +201,6 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
 {
    cout << " in draw_line & lines.size : " << lines.size() << endl;
    if (lines.size() == 0) return;
-
-   /*
-   NOTE : this is the function you might want to use as a starting point once you want to
-   average / extrapolate the line segments you detect to map out the full
-   extent of the lane(going from the result shown in raw - lines - example.mp4
-   to that shown in P1_example.mp4).
-
-   Think about things like separating line segments by their
-   slope((y2 - y1) / (x2 - x1)) to decide which segments are part of the left
-   line vs.the right line.Then, you can average the position of each of
-   the lines and extrapolate to the top and bottom of the lane.
-
-   This function draws `lines` with `color` and `thickness`.
-   Lines are drawn on the image inplace(mutates the image).
-   If you want to make the lines semi - transparent, think about combining
-   this function with the weighted_img() function below
-   */
 
    // In case of error, don't draw the line(s)
    bool draw_right = true;
@@ -320,8 +298,6 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
       gsl_fit_linear(right_lines_x, 1, right_lines_y, 1, right_index,
          &c0, &c1, &cov00, &cov01, &cov11, &sumsq);
 
-      //printf("# best fit: Y = %g + %g X\n", c0, c1);
-
       right_m = c1;
       right_b = c0;
    }
@@ -362,9 +338,7 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
       double c0, c1, cov00, cov01, cov11, sumsq;
       gsl_fit_linear(left_lines_x, 1, left_lines_y, 1, left_index,
          &c0, &c1, &cov00, &cov01, &cov11, &sumsq);
-
-      //printf("# best fit: Y = %g + %g X\n", c0, c1);
-
+	   
       left_m = c1;
       left_b = c0;
    }
@@ -423,10 +397,10 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
 
    if(left_x1 > 0 && left_x2 > 0 && right_x1 > 0 && right_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width && right_x1 < camera_width && right_x2 < camera_width) {
       center_x1 = (right_x1 + left_x1) / 2;
-   } else if((left_x1 < 0 || left_x2 < 0) && (right_x1 > 0 && right_x2 > 0 && right_x1 < camera_width && right_x2 < camera_width)) { // ���ʼ� �Ⱥ��϶� : ��ȸ
+   } else if((left_x1 < 0 || left_x2 < 0) && (right_x1 > 0 && right_x2 > 0 && right_x1 < camera_width && right_x2 < camera_width)) { // ¿ÞÂÊ¼± ¾Èº¸ÀÏ¶§ : ÁÂÈ¸
       cout << "Calculate : Turn Left" << endl;
       center_x1 = (right_x1 + camera_width / 2) / 2;
-   } else if((right_x1 < 0 || right_x2 < 0) && (left_x1 > 0 && left_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width)) { // �����ʼ� �Ⱥ��϶�:��ȸ
+   } else if((right_x1 < 0 || right_x2 < 0) && (left_x1 > 0 && left_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width)) { // ¿À¸¥ÂÊ¼± ¾Èº¸ÀÏ¶§:¿ìÈ¸
       cout << "Calculate : Turn Right" << endl;
       center_x1 = (left_x1 + camera_width / 2) / 2;
    } else {
@@ -462,11 +436,11 @@ void calculate(){
    int height = img_bgr.size().height;
 
     
-   //2. 미리 ?�해???�색, ?��???범위 ?�에 ?�는 부분만 차선?�보�??�로 ?�?�함 
+   //2. ë¯¸ë¦¬ ?•í•´???°ìƒ‰, ?¸ë???ë²”ìœ„ ?´ì— ?ˆëŠ” ë¶€ë¶„ë§Œ ì°¨ì„ ?„ë³´ë¡??°ë¡œ ?€?¥í•¨ 
    Mat img_filtered;
    filter_colors(img_bgr, img_filtered);
 
-   //3. 그레?�스케???�상?�로 변?�하???��? ?�분??추출
+   //3. ê·¸ë ˆ?´ìŠ¤ì¼€???ìƒ?¼ë¡œ ë³€?˜í•˜???ì? ?±ë¶„??ì¶”ì¶œ
    cvtColor(img_filtered, img_gray, COLOR_BGR2GRAY);
    GaussianBlur(img_gray, img_gray, Size(3, 3), 0, 0);
    Canny(img_gray, img_edges, 50, 150);
@@ -484,31 +458,31 @@ void calculate(){
    points[3] = Point(width - (width * (1 - trap_bottom_width)) / 2, height);
 
 
-   //4. 차선 검출할 ?�역???�한??진행방향 바닥??존재?�는 차선?�로 ?�정)
+   //4. ì°¨ì„  ê²€ì¶œí•  ?ì—­???œí•œ??ì§„í–‰ë°©í–¥ ë°”ë‹¥??ì¡´ìž¬?˜ëŠ” ì°¨ì„ ?¼ë¡œ ?œì •)
    img_edges = region_of_interest(img_edges, points);
 
 
    UMat uImage_edges;
    img_edges.copyTo(uImage_edges);
 
-   //5. 직선 ?�분??추출(�?직선???�작좌표?� ?�좌?��? 계산??
+   //5. ì§ì„  ?±ë¶„??ì¶”ì¶œ(ê°?ì§ì„ ???œìž‘ì¢Œí‘œ?€ ?ì¢Œ?œë? ê³„ì‚°??
    vector<Vec4i> lines;
    HoughLinesP(uImage_edges, lines, rho, theta, hough_threshold, minLineLength, maxLineGap);
 
 
 
 
-   //6. 5번에??추출??직선?�분?�로부??좌우 차선???�을 가?�성?�는 직선?�만 ?�로 뽑아??   //좌우 각각 ?�나??직선??계산??(Linear Least-Squares Fitting)
+   //6. 5ë²ˆì—??ì¶”ì¶œ??ì§ì„ ?±ë¶„?¼ë¡œë¶€??ì¢Œìš° ì°¨ì„ ???ˆì„ ê°€?¥ì„±?ˆëŠ” ì§ì„ ?¤ë§Œ ?°ë¡œ ë½‘ì•„??   //ì¢Œìš° ê°ê° ?˜ë‚˜??ì§ì„ ??ê³„ì‚°??(Linear Least-Squares Fitting)
    Mat img_line = Mat::zeros(img_bgr.rows, img_bgr.cols, CV_8UC3);
    draw_line(img_line, lines);
 
 
-   //7. ?�본 ?�상??6번의 직선??같이 보여�?
+   //7. ?ë³¸ ?ìƒ??6ë²ˆì˜ ì§ì„ ??ê°™ì´ ë³´ì—¬ì¤?
    addWeighted(img_bgr, 0.8, img_line, 1.0, 0.0, img_annotated);
     
    
 
-   //9. 결과�??�면??보여�?
+   //9. ê²°ê³¼ë¥??”ë©´??ë³´ì—¬ì¤?
    
    Mat img_result;
    resize(img_annotated, img_annotated, Size(width*0.7, height*0.7));
