@@ -147,6 +147,7 @@ add_executable(arrow_detector src/arrow_detector.cpp)
 add_executable(lane_driving src/car.cpp)
 add_executable(lane_driving410 src/car410.cpp)
 add_executable(merge src/merge.cpp)
+add_executable(ori_merge src/original_merge.cpp)
 add_executable(obstacle_detection src/obstacle_detection.cpp)
 
 ## Rename C++ executable without prefix
@@ -162,6 +163,7 @@ add_dependencies(arrow_detector knu_ros_team4_generate_messages_cpp)
 add_dependencies(lane_driving knu_ros_team4_generate_messages_cpp)
 add_dependencies(lane_driving410 knu_ros_team4_generate_messages_cpp)
 add_dependencies(merge knu_ros_team4_generate_messages_cpp)
+add_dependencies(ori_merge knu_ros_team4_generate_messages_cpp)
 add_dependencies(obstacle_detection knu_ros_team4_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
@@ -172,6 +174,7 @@ target_link_libraries(arrow_detector ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} )
 target_link_libraries(lane_driving ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${GSL_LIBRARIES})
 target_link_libraries(lane_driving410 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${GSL_LIBRARIES})
 target_link_libraries(merge ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${GSL_LIBRARIES})
+target_link_libraries(ori_merge ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${GSL_LIBRARIES})
 target_link_libraries(obstacle_detection ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 

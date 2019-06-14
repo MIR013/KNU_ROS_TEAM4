@@ -206,16 +206,11 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 			msgAD.intAD = 0; //left
 		}
 	}else{
-     printf("arrow not detected\n");
+     //printf("arrow not detected\n");
      msgAD.intAD = -1; // no arrow
    }
-	if(msgAD.intAD != -1) {
-		for(int i = 0; i < 50; i++) {
-			pub.publish(msgAD);
-		}
-	} else {
+
 	pub.publish(msgAD);
-	}
 	
 	//clear
 	square.clear();
@@ -233,7 +228,7 @@ int main(int argc, char **argv)
 	// Create a subscriber object
 	image_transport::Subscriber subRGB = it.subscribe("/raspicam_node/image", 1, &poseMessageReceivedRGB, ros::VoidPtr(), image_transport::TransportHints("compressed"));
 	
-	pub = nh.advertise<knu_ros_team4::arrowDetecter>("arrowDetecter",100);
+	pub = nh.advertise<knu_ros_team4::arrowDetecter>("arrowDetecter",10);
 	// Let ROS take over
 	ros::spin();
 	return 0;

@@ -1,5 +1,3 @@
-#include <vector>
-#include <cmath>
 #include <nav_msgs/Odometry.h>
 #include <tf/tf.h>
 #include <iomanip>
@@ -9,32 +7,21 @@
 #include <opencv2/imgproc.hpp>
 #include <gsl/gsl_fit.h>
 #include <sensor_msgs/CompressedImage.h>
-#include <sensor_msgs/LaserScan.h>
-#include <geometry_msgs/Twist.h>
 #include <image_transport/image_transport.h>
 #include <iostream>  
 #include <cv_bridge/cv_bridge.h>
 #include <knu_ros_team4/arrowDetecter.h>
 
-#define toRadian(degree)	((degree) * (M_PI / 180.))
-#define toDegree(radian)	((radian) * (180. / M_PI))
+
 
 using namespace cv;
 using namespace std;
 
 ros::Publisher pub;
 ros::Subscriber subAD;
-ros::Subscriber subOdom;
-ros::Subscriber subScan;
 geometry_msgs::Twist baseCmd;
-sensor_msgs::LaserScan g_scan;
-nav_msgs::Odometry g_odom;
 boost::mutex mutex;
-boost::mutex mutex_scan;
-boost::mutex mutex_odom;
 
-// Flag
-int OBSTACLE_FLAG= 0;
 
 //Hough Transform
 float rho = 2; // distance resolution in pixels of the Hough grid
@@ -43,18 +30,24 @@ float hough_threshold = 15;    // minimum number of votes(intersections in Hough
 float minLineLength = 10; //minimum number of pixels making up a line
 float maxLineGap = 20;   //maximum gap in pixels between connectable line segments
 
-float delta = 0.349; // 20 degree
 
 //Region - of - interest vertices
 //We want a trapezoid shape, with bottom edge at the bottom of the image
 float trap_bottom_width = 0.85;  // width of bottom edge of trapezoid, expressed as percentage of image width
 float trap_top_width = 0.07;     // ditto for top edge of trapezoid
-float trap_height = 0.25;         // height of the trapezoid expressed as percentage of image height
+float trap_height = 0.4;         // height of the trapezoid expressed as percentage of image height
 
 int camera_width = 960;
 int camera_height = 480;
 int pre_center_x;
 int arrow = -1;
+int arrow_flag = -1;
+float left_angular_z = 0.3;
+float left_current_z = 0;
+float right_angular_z = -0.3;
+float right_current_z = 0;
+float increment_z = 0.005;
+
 //SCALAR LOWER_WHITE = SCALAR(200, 200, 200); //(RGB)
 //SCALAR UPPER_WHITE = SCALAR(255, 255, 255);
 //SCALAR LOWER_YELLOW = SCALAR(10, 100, 100); //(HSV)
@@ -67,125 +60,7 @@ Scalar upper_yellow = Scalar(10, 100, 100);
 
 Mat img, img_masked, img_mask;
 Mat img_bgr, img_gray, img_edges, img_hough, img_annotated;   
-
-template<typename T>
-inline bool isnan(T value)
-{
-    return value != value;
-}
-
-void
-odomMsgCallback(const nav_msgs::Odometry &msg)
-{
-    mutex_odom.lock(); {
-        g_odom = msg;
-    } mutex_odom.unlock();
-}
-
-void
-transform(vector<Vec3d> &laserScanXY, double x, double y, double theta)
-{
-    Vec3d newPt;
-    double cosTheta = cos(theta);
-    double sinTheta = sin(theta);
-    int nRangeSize = (int)laserScanXY.size();
-    // rotation matrix and translation matrix multiply R*T*Position
-    for(int i=0; i<nRangeSize; i++) {
-        newPt[0] = cosTheta*laserScanXY[i][0] + -1.*sinTheta*laserScanXY[i][1] + x;
-        newPt[1] = sinTheta*laserScanXY[i][0] + cosTheta*laserScanXY[i][1] + y;
-        newPt[2];
-        laserScanXY[i] = newPt;
-    }
-}
-
-void
-convertScan2XYZs(sensor_msgs::LaserScan& lrfScan, vector<Vec3d> &XYZs)
-{
-    int nRangeSize = (int)lrfScan.ranges.size();
-    XYZs.clear();
-    XYZs.resize(nRangeSize);
-
-    for(int i=0; i<nRangeSize; i++) {
-        double dRange = lrfScan.ranges[i];
-
-        if(isnan(dRange)) {
-            XYZs[i] = Vec3d(0., 0., 0.);
-        } else {
-            double dAngle = lrfScan.angle_min + i*lrfScan.angle_increment;
-            XYZs[i] = Vec3d(dRange*cos(dAngle), dRange*sin(dAngle), 0.);
-        }
-    }
-}
-
-
-void
-convertOdom2XYZRPY(nav_msgs::Odometry &odom, Vec3d &xyz, Vec3d &rpy)
-{
-    // 이동 저장
-    xyz[0] = odom.pose.pose.position.x;
-    xyz[1] = odom.pose.pose.position.y;
-    xyz[2] = odom.pose.pose.position.z;
-
-    // 회전 저장
-    tf::Quaternion rotationQuat = tf::Quaternion(odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w);
-    tf::Matrix3x3(rotationQuat).getEulerYPR(rpy[2], rpy[1], rpy[0]);
-}
-
-
-void
-distanceCheck(vector<Vec3d> &laserScanXY, double theta, double delta, double dMaxDist){
-    int nRangeSize = static_cast<int>(laserScanXY.size());
-    double dAngle;
-    double distance;
-    double obstacleMean = 0;
-    double obstacleCnt = 0;
-    int NearDistanceCheck = 0;
-    for(int i = 0; i < nRangeSize; i++){
-        dAngle = atan2(laserScanXY[i][1] - g_odom.pose.pose.position.y,
-                laserScanXY[i][0] - g_odom.pose.pose.position.x);
-        if(dAngle < theta + delta && dAngle > theta - delta){
-            distance = sqrt(pow(laserScanXY[i][0] - g_odom.pose.pose.position.x,2)
-                    + pow(laserScanXY[i][1] - g_odom.pose.pose.position.y,2));
-            //cout << "Near distance: " << distance << endl;
-            if(distance < 0.43){
-                NearDistanceCheck = 1;
-                obstacleMean += distance;
-                obstacleCnt++;
-            }
-
-        }
-    }
-    if(NearDistanceCheck == 1){
-        obstacleMean /= obstacleCnt;
-        cout << "장애물발견" << ", obstacle mean distance: " << obstacleMean << endl;
-        OBSTACLE_FLAG = 1;
-    }
-    else
-        OBSTACLE_FLAG = 0;
-}
-
-void
-scanMsgCallback(const sensor_msgs::LaserScan& msg)
-{
-    mutex_scan.lock(); {
-        g_scan = msg;
-    } mutex_scan.unlock();
-    // 이동 및 회전 정보
-    Vec3d xyz, rpy;
-    // LRF scan 정보
-    vector<Vec3d> laserScanXY;
-
-     // Mat distance for grid
-    const double dGridMaxDist = 4.0;
-
-    convertOdom2XYZRPY(g_odom,xyz,rpy);
-    convertScan2XYZs(g_scan,laserScanXY);
-
-    transform(laserScanXY,xyz[0],xyz[1],rpy[2]);
-    distanceCheck(laserScanXY,rpy[2],static_cast<double>(delta),dGridMaxDist);
-}
-
-
+ 
 Mat region_of_interest(Mat img_edges, Point *points)
 {
    /*
@@ -247,6 +122,7 @@ void filter_colors(Mat _img_bgr, Mat &img_filtered)
 
    img_combine.copyTo(img_filtered);
    
+/*
    img_bgr1.release();
    img_hsv.release();
    img_combine.release();
@@ -254,13 +130,12 @@ void filter_colors(Mat _img_bgr, Mat &img_filtered)
    white_image.release();
    yellow_mask.release();
    yellow_image.release();
+*/
 }
 
 void move_robot(int center_x1, float left_slope, float right_slope) {
    float increment_ratio = fabs(center_x1 / ((camera_width / 2) - 1)); // 90% or 110% -> result : 0.1
 
-   cout << "centerx : " << center_x1 << ", left_slope : " << left_slope << ", right_slpe : "
-<< right_slope << endl;
 	
    // 계산한 직선의 기울기의 비율이 너무크면 최대값으로 고
    if(increment_ratio > 1) {
@@ -269,13 +144,9 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
 
    // 두 차선의 중심이 오른쪽으로 가면 왼쪽으로 회
    if(center_x1 > camera_width / 2 + (camera_width / 10)){
-      cout << "Turn Left" << endl;
-	baseCmd.linear.x = 0.06;
-	baseCmd.angular.z = 0;
-       for(int i = 0; i < 100; i++) {
-	   pub.publish(baseCmd);
-	}
-      baseCmd.angular.z = 0.2 * (increment_ratio + 1);
+      ROS_INFO("Turn Left");
+	baseCmd.linear.x = 0.03;
+      	baseCmd.angular.z = 0.12 * (increment_ratio + 1);
 
       if(baseCmd.angular.z < 0){
 		baseCmd.angular.z *= -1;
@@ -284,44 +155,50 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
    }
    // 두 차선의 중심이 왼쪽으로 가면 오른쪽으로 회전
    else if(center_x1 < camera_width / 2 - (camera_width / 10)){
-       cout << "Turn Right" << endl;
-	baseCmd.linear.x = 0.06;
-	baseCmd.angular.z = 0;
-       for(int i = 0; i < 100; i++) {
-	   pub.publish(baseCmd);
-	}
-       baseCmd.angular.z = -0.2 * (increment_ratio + 1);
+       ROS_INFO("Turn Right");
+	baseCmd.linear.x = 0.03;
+       	baseCmd.angular.z = -0.12 * (increment_ratio + 1);
+
        if(baseCmd.angular.z > 0){
 		baseCmd.angular.z *= -1;
        }
       
-   }else{
+   }
+	// go straight
+   else {
       baseCmd.angular.z = 0;
-      baseCmd.linear.x = 0.06;
+      baseCmd.linear.x = 0.03;
    }
    // 회전속도가 혹시 너무 높아지면 한계값으로 설
-   if(baseCmd.angular.z > 0.4) {
-     baseCmd.angular.z = 0.3;
+   if(fabs(baseCmd.angular.z) > 0.4) {
+     if(baseCmd.angular.z > 0)
+	baseCmd.angular.z = 0.3;
+     else
+	baseCmd.angular.z = -0.3;
    }
 
-   cout << "--------angular speed = " << baseCmd.angular.z << endl;
+   ROS_INFO("angular speed = %lf", baseCmd.angular.z);
 	   
    // 수진이 코드 합친것
    // Arrow 발견되면 flag값을 1로 변경후 회전속도 설
-   int flag = 0;
+   // Arrow 발견되면 flag값을 1로 변경후 회전속도 설
    if(arrow == 1) { // right arrow
-	baseCmd.angular.z = -0.75;
-	flag = 1;
+	baseCmd.angular.z = -0.15;
+  	 pub.publish(baseCmd);
+	ROS_INFO("right sleep");
+	sleep(3);
    } else if(arrow == 0) { //left arrow
-	baseCmd.angular.z = 0.75;
-	flag = 1;
+	baseCmd.angular.z = 0.15;
+	pub.publish(baseCmd);
+	ROS_INFO("left sleep");
+	sleep(3);
    }
-   
+
    // 정우형 코드 부분
-   if(OBSTACLE_FLAG == 1) {
+   int obstacle_flag = 0;
+   if(obstacle_flag == 1) { 
 	// 앞의 차량 발견되면?
-       baseCmd.linear.x = g_odom.twist.twist.linear.x/2;
-   } else if(OBSTACLE_FLAG == 0) {
+   } else if(obstacle_flag == 0) { 
 	// 그냥 정상주
    }
 
@@ -331,7 +208,7 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
 
 void draw_line(Mat &img_line, vector<Vec4i> lines)
 {
-   cout << " in draw_line & lines.size : " << lines.size() << endl;
+   //cout << " in draw_line & lines.size : " << lines.size() << endl;
    if (lines.size() == 0) return;
 
    // In case of error, don't draw the line(s)
@@ -408,6 +285,7 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
 
    int right_index = 0;
    for (int i = 0; i < right_lines.size(); i++) {
+	//ROS_INFO("size is %d", right_lines.size());
 
       Vec4i line = right_lines[i];
       int x1 = line[0];
@@ -523,20 +401,26 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
 	right_slope = (y2 - y1) / (float)(right_x2 - right_x1);
 	}
 
-   cout << "left_x1=" << left_x1 << ", left_x2=" << left_x2 << ", right_x1=" << right_x1 << ", right_x2=" << right_x2 << endl;
+   //cout << "left_x1=" << left_x1 << ", left_x2=" << left_x2 << ", right_x1=" << right_x1 << ", right_x2=" << right_x2 << endl;
    
    int center_x1;
 
    if(left_x1 > 0 && left_x2 > 0 && right_x1 > 0 && right_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width && right_x1 < camera_width && right_x2 < camera_width) {
       center_x1 = (right_x1 + left_x1) / 2;
-   } else if((left_x1 < 0 || left_x2 < 0) && (right_x1 > 0 && right_x2 > 0 && right_x1 < camera_width && right_x2 < camera_width)) { // ¿ÞÂÊ¼± ¾Èº¸ÀÏ¶§ : ÁÂÈ¸
-      cout << "Calculate : Turn Left" << endl;
+   } 
+
+   else if((left_x1 < 0 || left_x2 < 0) && (right_x1 > 0 && right_x2 > 0 && right_x1 < camera_width && right_x2 < camera_width)) { // ¿ÞÂÊ¼± ¾Èº¸ÀÏ¶§ : ÁÂÈ¸
+      //cout << "Calculate : Turn Left" << endl;
       center_x1 = (right_x1 + camera_width / 2) / 2;
-   } else if((right_x1 < 0 || right_x2 < 0) && (left_x1 > 0 && left_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width)) { // ¿À¸¥ÂÊ¼± ¾Èº¸ÀÏ¶§:¿ìÈ¸
-      cout << "Calculate : Turn Right" << endl;
+   } 
+
+   else if((right_x1 < 0 || right_x2 < 0) && (left_x1 > 0 && left_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width)) { // ¿À¸¥ÂÊ¼± ¾Èº¸ÀÏ¶§:¿ìÈ¸
+      //cout << "Calculate : Turn Right" << endl;
       center_x1 = (left_x1 + camera_width / 2) / 2;
-   } else {
-      cout << "Calculate : Except!!" << endl;
+   } 
+
+  else {
+      //cout << "Calculate : Except!!" << endl;
       center_x1 = pre_center_x;
    }
 
@@ -556,9 +440,6 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
 
 
 void calculate(){
-
-   cout << "i'm calculate" << endl;
-  
    char buf[256];
    
 
@@ -568,11 +449,11 @@ void calculate(){
    int height = img_bgr.size().height;
 
     
-   //2. ë¯¸ë¦¬ ?•í•´???°ìƒ‰, ?¸ë???ë²”ìœ„ ?´ì— ?ˆëŠ” ë¶€ë¶„ë§Œ ì°¨ì„ ?„ë³´ë¡??°ë¡œ ?€?¥í•¨ 
+   //2. ë¯¸ë¦¬ ?•í•´???°ìƒ‰, ?¸ë???ë²”ìœ„ ?´ì— ?ˆëŠ” ë¶€ë¶„ë§Œ ì°¨ì„ ?„ë³´ë¡??°ë¡œ ?€?¥í•¨ 
    Mat img_filtered;
    filter_colors(img_bgr, img_filtered);
 
-   //3. ê·¸ë ˆ?´ìŠ¤ì¼€???ìƒ?¼ë¡œ ë³€?˜í•˜???ì? ?±ë¶„??ì¶”ì¶œ
+   //3. ê·¸ë ˆ?´ìŠ¤ì¼€???ìƒ?¼ë¡œ ë³€?˜í•˜???ì? ?±ë¶„??ì¶”ì¶œ
    cvtColor(img_filtered, img_gray, COLOR_BGR2GRAY);
    GaussianBlur(img_gray, img_gray, Size(3, 3), 0, 0);
    Canny(img_gray, img_edges, 50, 150);
@@ -590,26 +471,26 @@ void calculate(){
    points[3] = Point(width - (width * (1 - trap_bottom_width)) / 2, height);
 
 
-   //4. ì°¨ì„  ê²€ì¶œí•  ?ì—­???œí•œ??ì§„í–‰ë°©í–¥ ë°”ë‹¥??ì¡´ìž¬?˜ëŠ” ì°¨ì„ ?¼ë¡œ ?œì •)
+   //4. ì°¨ì„  ê²€ì¶œí•  ?ì—­???œí•œ??ì§„í–‰ë°©í–¥ ë°”ë‹¥??ì¡´ìž¬?˜ëŠ” ì°¨ì„ ?¼ë¡œ ?œì •)
    img_edges = region_of_interest(img_edges, points);
 
 
    UMat uImage_edges;
    img_edges.copyTo(uImage_edges);
 
-   //5. ì§ì„  ?±ë¶„??ì¶”ì¶œ(ê°?ì§ì„ ???œìž‘ì¢Œí‘œ?€ ?ì¢Œ?œë? ê³„ì‚°??
+   //5. ì§ì„  ?±ë¶„??ì¶”ì¶œ(ê°?ì§ì„ ???œìž‘ì¢Œí‘œ?€ ?ì¢Œ?œë? ê³„ì‚°??
    vector<Vec4i> lines;
    HoughLinesP(uImage_edges, lines, rho, theta, hough_threshold, minLineLength, maxLineGap);
 
 
 
 
-   //6. 5ë²ˆì—??ì¶”ì¶œ??ì§ì„ ?±ë¶„?¼ë¡œë¶€??ì¢Œìš° ì°¨ì„ ???ˆì„ ê°€?¥ì„±?ˆëŠ” ì§ì„ ?¤ë§Œ ?°ë¡œ ë½‘ì•„??   //ì¢Œìš° ê°ê° ?˜ë‚˜??ì§ì„ ??ê³„ì‚°??(Linear Least-Squares Fitting)
+   //6. 5ë²ˆì—??ì¶”ì¶œ??ì§ì„ ?±ë¶„?¼ë¡œë¶€??ì¢Œìš° ì°¨ì„ ???ˆì„ ê°€?¥ì„±?ˆëŠ” ì§ì„ ?¤ë§Œ ?°ë¡œ ë½‘ì•„??   //ì¢Œìš° ê°ê° ?˜ë‚˜??ì§ì„ ??ê³„ì‚°??(Linear Least-Squares Fitting)
    Mat img_line = Mat::zeros(img_bgr.rows, img_bgr.cols, CV_8UC3);
    draw_line(img_line, lines);
 
 
-   //7. ?ë³¸ ?ìƒ??6ë²ˆì˜ ì§ì„ ??ê°™ì´ ë³´ì—¬ì¤?
+   //7. ?ë³¸ ?ìƒ??6ë²ˆì˜ ì§ì„ ??ê°™ì´ ë³´ì—¬ì¤?
    addWeighted(img_bgr, 0.8, img_line, 1.0, 0.0, img_annotated);
     
    
@@ -623,7 +504,7 @@ void calculate(){
    hconcat(img_edges, img_annotated, img_result);
    imshow("video", img_result);
 
-   waitKey(30); 
+   waitKey(1); 
   
 }
 
@@ -640,7 +521,7 @@ void poseMessageReceived(const sensor_msgs::ImageConstPtr& msg) {
     
   }mutex.unlock();
   
-    cout << "in callback" << endl;
+    //cout << "in callback" << endl;
     calculate();
   
 }
@@ -652,14 +533,10 @@ int main(int argc, char** argv)
 
 
    pub = nhp.advertise<geometry_msgs::Twist>("/cmd_vel", 100);
-   subAD = nh.subscribe("arrowDetecter", 1,&arrowMessage);
-   //subScan = nh.subscribe("/scan",10,&scanMsgCallback);
-   subOdom = nh.subscribe("/odom", 1,&odomMsgCallback);
+   subAD = nh.subscribe("arrowDetecter",1,&arrowMessage);
    image_transport::Subscriber sub = it.subscribe("/raspicam_node/image", 1, &poseMessageReceived, ros::VoidPtr(), image_transport::TransportHints("compressed"));
 
-
   while(ros::ok()){
-    cout << "main" << endl;
     baseCmd.linear.x = 0.01;
     pub.publish(baseCmd);
      ros::spin();
