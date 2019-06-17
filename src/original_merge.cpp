@@ -34,11 +34,11 @@ float maxLineGap = 20;   //maximum gap in pixels between connectable line segmen
 //Region - of - interest vertices
 //We want a trapezoid shape, with bottom edge at the bottom of the image
 float trap_bottom_width = 0.85;  // width of bottom edge of trapezoid, expressed as percentage of image width
-float trap_top_width = 0.07;     // ditto for top edge of trapezoid
-float trap_height = 0.4;         // height of the trapezoid expressed as percentage of image height
+float trap_top_width = 0.85;     // ditto for top edge of trapezoid
+float trap_height = 0.5;         // height of the trapezoid expressed as percentage of image height
 
-int camera_width = 960;
-int camera_height = 480;
+int camera_width = 1200;
+int camera_height = 600;
 int pre_center_x;
 int arrow = -1;
 int arrow_flag = -1;
@@ -53,10 +53,10 @@ float increment_z = 0.005;
 //SCALAR LOWER_YELLOW = SCALAR(10, 100, 100); //(HSV)
 //SCALAR UPPER_YELLOW = SCALAR(40, 255, 255);
 
-Scalar lower_white = Scalar(0, 0, 0); //(RGB)
-Scalar upper_white = Scalar(10, 100, 100);
+Scalar lower_white = Scalar(0,0,0); //(RGB)
+Scalar upper_white = Scalar(10, 50, 50);
 Scalar lower_yellow = Scalar(0, 0, 0); //(HSV)
-Scalar upper_yellow = Scalar(10, 100, 100);
+Scalar upper_yellow = Scalar(10, 50, 50);
 
 Mat img, img_masked, img_mask;
 Mat img_bgr, img_gray, img_edges, img_hough, img_annotated;   
@@ -186,12 +186,12 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
 	baseCmd.angular.z = -0.15;
   	 pub.publish(baseCmd);
 	ROS_INFO("right sleep");
-	sleep(3);
+	//sleep(3);
    } else if(arrow == 0) { //left arrow
 	baseCmd.angular.z = 0.15;
 	pub.publish(baseCmd);
 	ROS_INFO("left sleep");
-	sleep(3);
+	//sleep(3);
    }
 
    // 정우형 코드 부분
@@ -411,12 +411,14 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
 
    else if((left_x1 < 0 || left_x2 < 0) && (right_x1 > 0 && right_x2 > 0 && right_x1 < camera_width && right_x2 < camera_width)) { // ¿ÞÂÊ¼± ¾Èº¸ÀÏ¶§ : ÁÂÈ¸
       //cout << "Calculate : Turn Left" << endl;
-      center_x1 = (right_x1 + camera_width / 2) / 2;
+      //center_x1 = (right_x1 + camera_width / 2) / 2;
+	center_x1 = abs(right_x2 - (camera_width / 2)) + (camera_width / 2);
    } 
 
    else if((right_x1 < 0 || right_x2 < 0) && (left_x1 > 0 && left_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width)) { // ¿À¸¥ÂÊ¼± ¾Èº¸ÀÏ¶§:¿ìÈ¸
       //cout << "Calculate : Turn Right" << endl;
-      center_x1 = (left_x1 + camera_width / 2) / 2;
+      //center_x1 = (left_x1 + camera_width / 2) / 2;
+	center_x1 = abs(left_x2 - (camera_width / 2)) + (camera_width / 2);
    } 
 
   else {

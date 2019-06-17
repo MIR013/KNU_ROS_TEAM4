@@ -49,12 +49,18 @@ float delta = 0.349; // 20 degree
 //We want a trapezoid shape, with bottom edge at the bottom of the image
 float trap_bottom_width = 0.85;  // width of bottom edge of trapezoid, expressed as percentage of image width
 float trap_top_width = 0.07;     // ditto for top edge of trapezoid
-float trap_height = 0.25;         // height of the trapezoid expressed as percentage of image height
+float trap_height = 0.4;         // height of the trapezoid expressed as percentage of image height
 
-int camera_width = 960;
+int camera_width = 640;
 int camera_height = 480;
 int pre_center_x;
 int arrow = -1;
+int arrow_flag = -1;
+float left_angular_z = 0.3;
+float left_current_z = 0;
+float right_angular_z = -0.3;
+float right_current_z = 0;
+float increment_z = 0.005;
 //SCALAR LOWER_WHITE = SCALAR(200, 200, 200); //(RGB)
 //SCALAR UPPER_WHITE = SCALAR(255, 255, 255);
 //SCALAR LOWER_YELLOW = SCALAR(10, 100, 100); //(HSV)
@@ -147,7 +153,7 @@ distanceCheck(vector<Vec3d> &laserScanXY, double theta, double delta, double dMa
             distance = sqrt(pow(laserScanXY[i][0] - g_odom.pose.pose.position.x,2)
                     + pow(laserScanXY[i][1] - g_odom.pose.pose.position.y,2));
             //cout << "Near distance: " << distance << endl;
-            if(distance < 0.43){
+            if(distance < 0.20){
                 NearDistanceCheck = 1;
                 obstacleMean += distance;
                 obstacleCnt++;
@@ -155,7 +161,7 @@ distanceCheck(vector<Vec3d> &laserScanXY, double theta, double delta, double dMa
 
         }
     }
-    if(NearDistanceCheck == 1){
+    if(NearDistanceCheck == 1 && obstacleMean != 0){
         obstacleMean /= obstacleCnt;
         cout << "장애물발견" << ", obstacle mean distance: " << obstacleMean << endl;
         OBSTACLE_FLAG = 1;
@@ -259,8 +265,6 @@ void filter_colors(Mat _img_bgr, Mat &img_filtered)
 void move_robot(int center_x1, float left_slope, float right_slope) {
    float increment_ratio = fabs(center_x1 / ((camera_width / 2) - 1)); // 90% or 110% -> result : 0.1
 
-   cout << "centerx : " << center_x1 << ", left_slope : " << left_slope << ", right_slpe : "
-<< right_slope << endl;
 	
    // 계산한 직선의 기울기의 비율이 너무크면 최대값으로 고
    if(increment_ratio > 1) {
@@ -269,14 +273,10 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
 
    // 두 차선의 중심이 오른쪽으로 가면 왼쪽으로 회
    if(center_x1 > camera_width / 2 + (camera_width / 10)){
-      cout << "Turn Left" << endl;
-	baseCmd.linear.x = 0.06;
-	baseCmd.angular.z = 0;
-       for(int i = 0; i < 100; i++) {
-	   pub.publish(baseCmd);
-	}
-      baseCmd.angular.z = 0.2 * (increment_ratio + 1);
-
+      ROS_INFO("Turn Left");
+	baseCmd.linear.x = 0.03;
+      	//baseCmd.angular.z = 0.12 * (increment_ratio + 1);
+	baseCmd.angular.z = 0.2;
       if(baseCmd.angular.z < 0){
 		baseCmd.angular.z *= -1;
       }
@@ -284,43 +284,50 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
    }
    // 두 차선의 중심이 왼쪽으로 가면 오른쪽으로 회전
    else if(center_x1 < camera_width / 2 - (camera_width / 10)){
-       cout << "Turn Right" << endl;
-	baseCmd.linear.x = 0.06;
-	baseCmd.angular.z = 0;
-       for(int i = 0; i < 100; i++) {
-	   pub.publish(baseCmd);
-	}
-       baseCmd.angular.z = -0.2 * (increment_ratio + 1);
+       ROS_INFO("Turn Right");
+	baseCmd.linear.x = 0.03;
+       	//baseCmd.angular.z = -0.12 * (increment_ratio + 1);
+	baseCmd.angular.z = -0.2;
        if(baseCmd.angular.z > 0){
 		baseCmd.angular.z *= -1;
        }
       
-   }else{
+   }
+	// go straight
+   else {
       baseCmd.angular.z = 0;
-      baseCmd.linear.x = 0.06;
+      baseCmd.linear.x = 0.03;
    }
    // 회전속도가 혹시 너무 높아지면 한계값으로 설
-   if(baseCmd.angular.z > 0.4) {
-     baseCmd.angular.z = 0.3;
+   if(fabs(baseCmd.angular.z) > 0.4) {
+     if(baseCmd.angular.z > 0)
+	baseCmd.angular.z = 0.3;
+     else
+	baseCmd.angular.z = -0.3;
    }
 
-   cout << "--------angular speed = " << baseCmd.angular.z << endl;
+   ROS_INFO("angular speed = %lf", baseCmd.angular.z);
 	   
    // 수진이 코드 합친것
    // Arrow 발견되면 flag값을 1로 변경후 회전속도 설
-   int flag = 0;
    if(arrow == 1) { // right arrow
-	baseCmd.angular.z = -0.75;
-	flag = 1;
+	baseCmd.angular.z = -0.15;
+  	 pub.publish(baseCmd);
+	ROS_INFO("right sleep");
+	ros::Duration(3).sleep();
    } else if(arrow == 0) { //left arrow
-	baseCmd.angular.z = 0.75;
-	flag = 1;
+	baseCmd.angular.z = 0.15;
+	pub.publish(baseCmd);
+	ROS_INFO("left sleep");
+	ros::Duration(3).sleep();
    }
    
    // 정우형 코드 부분
    if(OBSTACLE_FLAG == 1) {
 	// 앞의 차량 발견되면?
-       baseCmd.linear.x = g_odom.twist.twist.linear.x/2;
+        //baseCmd.linear.x = g_odom.twist.twist.linear.x/2;
+	baseCmd.linear.x = 0;
+	baseCmd.angular.z = 0;
    } else if(OBSTACLE_FLAG == 0) {
 	// 그냥 정상주
    }
@@ -523,20 +530,28 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
 	right_slope = (y2 - y1) / (float)(right_x2 - right_x1);
 	}
 
-   cout << "left_x1=" << left_x1 << ", left_x2=" << left_x2 << ", right_x1=" << right_x1 << ", right_x2=" << right_x2 << endl;
+   //cout << "left_x1=" << left_x1 << ", left_x2=" << left_x2 << ", right_x1=" << right_x1 << ", right_x2=" << right_x2 << endl;
    
    int center_x1;
 
    if(left_x1 > 0 && left_x2 > 0 && right_x1 > 0 && right_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width && right_x1 < camera_width && right_x2 < camera_width) {
       center_x1 = (right_x1 + left_x1) / 2;
-   } else if((left_x1 < 0 || left_x2 < 0) && (right_x1 > 0 && right_x2 > 0 && right_x1 < camera_width && right_x2 < camera_width)) { // ¿ÞÂÊ¼± ¾Èº¸ÀÏ¶§ : ÁÂÈ¸
-      cout << "Calculate : Turn Left" << endl;
+   } 
+
+   else if((left_x1 < 0 || left_x2 < 0) && (right_x1 > 0 && right_x2 > 0 && right_x1 < camera_width && right_x2 < camera_width)) { // ¿ÞÂÊ¼± ¾Èº¸ÀÏ¶§ : ÁÂÈ¸
+      //cout << "Calculate : Turn Left" << endl;
       center_x1 = (right_x1 + camera_width / 2) / 2;
-   } else if((right_x1 < 0 || right_x2 < 0) && (left_x1 > 0 && left_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width)) { // ¿À¸¥ÂÊ¼± ¾Èº¸ÀÏ¶§:¿ìÈ¸
-      cout << "Calculate : Turn Right" << endl;
+	//center_x1 = abs(right_x2 - (camera_width / 2)) + (camera_width / 2);
+   } 
+
+   else if((right_x1 < 0 || right_x2 < 0) && (left_x1 > 0 && left_x2 > 0 && left_x1 < camera_width && left_x2 < camera_width)) { // ¿À¸¥ÂÊ¼± ¾Èº¸ÀÏ¶§:¿ìÈ¸
+      //cout << "Calculate : Turn Right" << endl;
       center_x1 = (left_x1 + camera_width / 2) / 2;
-   } else {
-      cout << "Calculate : Except!!" << endl;
+	//center_x1 = abs(left_x2 - (camera_width / 2)) + (camera_width / 2);
+   } 
+
+  else {
+      //cout << "Calculate : Except!!" << endl;
       center_x1 = pre_center_x;
    }
 
@@ -557,7 +572,6 @@ void draw_line(Mat &img_line, vector<Vec4i> lines)
 
 void calculate(){
 
-   cout << "i'm calculate" << endl;
   
    char buf[256];
    
@@ -640,7 +654,6 @@ void poseMessageReceived(const sensor_msgs::ImageConstPtr& msg) {
     
   }mutex.unlock();
   
-    cout << "in callback" << endl;
     calculate();
   
 }
@@ -653,13 +666,12 @@ int main(int argc, char** argv)
 
    pub = nhp.advertise<geometry_msgs::Twist>("/cmd_vel", 100);
    subAD = nh.subscribe("arrowDetecter", 1,&arrowMessage);
-   //subScan = nh.subscribe("/scan",10,&scanMsgCallback);
+   subScan = nh.subscribe("/scan",1,&scanMsgCallback);
    subOdom = nh.subscribe("/odom", 1,&odomMsgCallback);
    image_transport::Subscriber sub = it.subscribe("/raspicam_node/image", 1, &poseMessageReceived, ros::VoidPtr(), image_transport::TransportHints("compressed"));
 
 
   while(ros::ok()){
-    cout << "main" << endl;
     baseCmd.linear.x = 0.01;
     pub.publish(baseCmd);
      ros::spin();

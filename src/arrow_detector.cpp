@@ -155,9 +155,9 @@ int whichSide(int idx)
 
 	//was not similar y triangle
 	int findex=0;
-	if(fabs(triangle[idx][0].first-triangle[idx][1].first)<20){
+	if(fabs(triangle[idx][0].first-triangle[idx][1].first)<60){
 		findex = 2;
-	}else if(fabs(triangle[idx][0].first-triangle[idx][2].first)<20){
+	}else if(fabs(triangle[idx][0].first-triangle[idx][2].first)<60){
 		findex = 1;
 	}else{
 		findex = 0;
@@ -209,8 +209,8 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
      //printf("arrow not detected\n");
      msgAD.intAD = -1; // no arrow
    }
-
 	pub.publish(msgAD);
+
 	
 	//clear
 	square.clear();
