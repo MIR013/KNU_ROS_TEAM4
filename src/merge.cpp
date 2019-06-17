@@ -30,11 +30,14 @@ geometry_msgs::Twist baseCmd;
 sensor_msgs::LaserScan g_scan;
 nav_msgs::Odometry g_odom;
 boost::mutex mutex;
+boost::mutex mutex_sleep;
 boost::mutex mutex_scan;
 boost::mutex mutex_odom;
 
 // Flag
 int OBSTACLE_FLAG= 0;
+int TOLLGATE_FLAG= 0;
+int TOLLGATE_STOP= 0;
 
 //Hough Transform
 float rho = 2; // distance resolution in pixels of the Hough grid
@@ -47,7 +50,7 @@ float delta = 0.349; // 20 degree
 
 //Region - of - interest vertices
 //We want a trapezoid shape, with bottom edge at the bottom of the image
-float trap_bottom_width = 0.85;  // width of bottom edge of trapezoid, expressed as percentage of image width
+float trap_bottom_width = 1;  // width of bottom edge of trapezoid, expressed as percentage of image width
 float trap_top_width = 0.07;     // ditto for top edge of trapezoid
 float trap_height = 0.4;         // height of the trapezoid expressed as percentage of image height
 
@@ -146,12 +149,19 @@ distanceCheck(vector<Vec3d> &laserScanXY, double theta, double delta, double dMa
     double obstacleMean = 0;
     double obstacleCnt = 0;
     int NearDistanceCheck = 0;
+    double temp = 1.57; // 90 degree
+    int TollgateCheck_left = 0;
+    int TollgateCheck_right = 0;
+    int TollgateDetected = 0;
+    int TollgateStop_1 = 0;
+    int TollgateStop_2 = 0;
+    int TollgateStoped = 0;
     for(int i = 0; i < nRangeSize; i++){
         dAngle = atan2(laserScanXY[i][1] - g_odom.pose.pose.position.y,
                 laserScanXY[i][0] - g_odom.pose.pose.position.x);
-        if(dAngle < theta + delta && dAngle > theta - delta){
-            distance = sqrt(pow(laserScanXY[i][0] - g_odom.pose.pose.position.x,2)
+	distance = sqrt(pow(laserScanXY[i][0] - g_odom.pose.pose.position.x,2)
                     + pow(laserScanXY[i][1] - g_odom.pose.pose.position.y,2));
+        if(dAngle < theta + delta && dAngle > theta - delta){
             //cout << "Near distance: " << distance << endl;
             if(distance < 0.20){
                 NearDistanceCheck = 1;
@@ -160,14 +170,45 @@ distanceCheck(vector<Vec3d> &laserScanXY, double theta, double delta, double dMa
             }
 
         }
+	else{
+
+		if(dAngle > theta && dAngle < theta + temp && distance < 0.35) // left
+			TollgateCheck_left = 1;
+
+		if(dAngle < theta && dAngle > theta - temp && distance < 0.35) // right
+			TollgateCheck_right = 1;
+
+		if(TollgateCheck_right == 1 && TollgateCheck_left == 1){
+		        TollgateDetected = 1;
+		}
+
+		if(dAngle > theta + temp && dAngle < theta + temp + temp)
+			TollgateStop_1 = 1;
+		if(dAngle < theta - temp && dAngle > theta - temp - temp)
+			TollgateStop_2 = 1;
+
+		if(TollgateStop_1 == 1 && TollgateStop_2 == 1){
+		    if(distance < 0.60){
+		        TollgateStoped = 1;
+		    }
+
+		}
+	}
     }
     if(NearDistanceCheck == 1 && obstacleMean != 0){
         obstacleMean /= obstacleCnt;
         cout << "장애물발견" << ", obstacle mean distance: " << obstacleMean << endl;
         OBSTACLE_FLAG = 1;
     }
-    else
-        OBSTACLE_FLAG = 0;
+    else if(TollgateDetected == 1 ) {
+        cout << "AAAAAAAAAAAAAAAAAAA"<< endl;
+        TOLLGATE_FLAG = 1;
+    }
+
+    else {
+	TOLLGATE_FLAG = 0;
+	OBSTACLE_FLAG = 0;
+    }
 }
 
 void
@@ -272,22 +313,22 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
    }
 
    // 두 차선의 중심이 오른쪽으로 가면 왼쪽으로 회
-   if(center_x1 > camera_width / 2 + (camera_width / 10)){
+   if(center_x1 > (camera_width / 2) + (camera_width / 30)){
       ROS_INFO("Turn Left");
-	baseCmd.linear.x = 0.03;
+	baseCmd.linear.x = 0.06;
       	//baseCmd.angular.z = 0.12 * (increment_ratio + 1);
-	baseCmd.angular.z = 0.2;
+	baseCmd.angular.z = 0.4;
       if(baseCmd.angular.z < 0){
 		baseCmd.angular.z *= -1;
       }
 
    }
    // 두 차선의 중심이 왼쪽으로 가면 오른쪽으로 회전
-   else if(center_x1 < camera_width / 2 - (camera_width / 10)){
+   else if(center_x1 < (camera_width / 2) - (camera_width / 30)){
        ROS_INFO("Turn Right");
-	baseCmd.linear.x = 0.03;
+	baseCmd.linear.x = 0.06;
        	//baseCmd.angular.z = -0.12 * (increment_ratio + 1);
-	baseCmd.angular.z = -0.2;
+	baseCmd.angular.z = -0.4;
        if(baseCmd.angular.z > 0){
 		baseCmd.angular.z *= -1;
        }
@@ -296,14 +337,14 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
 	// go straight
    else {
       baseCmd.angular.z = 0;
-      baseCmd.linear.x = 0.03;
+      baseCmd.linear.x = 0.06;
    }
    // 회전속도가 혹시 너무 높아지면 한계값으로 설
-   if(fabs(baseCmd.angular.z) > 0.4) {
+   if(fabs(baseCmd.angular.z) > 0.9) {
      if(baseCmd.angular.z > 0)
-	baseCmd.angular.z = 0.3;
+	baseCmd.angular.z = 0.6;
      else
-	baseCmd.angular.z = -0.3;
+	baseCmd.angular.z = -0.6;
    }
 
    ROS_INFO("angular speed = %lf", baseCmd.angular.z);
@@ -311,16 +352,21 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
    // 수진이 코드 합친것
    // Arrow 발견되면 flag값을 1로 변경후 회전속도 설
    if(arrow == 1) { // right arrow
-	baseCmd.angular.z = -0.15;
+	mutex_sleep.lock();
+	baseCmd.angular.z = -0.4;
   	 pub.publish(baseCmd);
 	ROS_INFO("right sleep");
-	ros::Duration(3).sleep();
+	ros::Duration(2.0).sleep();
+	mutex_sleep.unlock();
    } else if(arrow == 0) { //left arrow
-	baseCmd.angular.z = 0.15;
+	mutex_sleep.lock();
+	baseCmd.angular.z = 0.4;
 	pub.publish(baseCmd);
 	ROS_INFO("left sleep");
-	ros::Duration(3).sleep();
+	ros::Duration(1.5).sleep();
+	mutex_sleep.unlock();
    }
+   arrow = -1;
    
    // 정우형 코드 부분
    if(OBSTACLE_FLAG == 1) {
@@ -332,6 +378,24 @@ void move_robot(int center_x1, float left_slope, float right_slope) {
 	// 그냥 정상주
    }
 
+   //  코드 부분
+   if(TOLLGATE_FLAG == 1) {
+	// 앞의 차량 발견되면?
+        //baseCmd.linear.x = g_odom.twist.twist.linear.x/2;
+	baseCmd.linear.x = 0.02;
+	baseCmd.angular.z = 0;
+   } else if(TOLLGATE_FLAG == 0) {
+	// 그냥 정상주
+   }
+
+   if(TOLLGATE_STOP == 1) {
+	// 앞의 차량 발견되면?
+        //baseCmd.linear.x = g_odom.twist.twist.linear.x/2;
+	baseCmd.linear.x = 0;
+	baseCmd.angular.z = 0;
+   } else if(TOLLGATE_STOP == 0) {
+	// 그냥 정상주
+   }
    pub.publish(baseCmd);
 }
 
@@ -643,8 +707,10 @@ void calculate(){
 
 void
 arrowMessage(const knu_ros_team4::arrowDetecter &msg){
-	ROS_INFO("Arrow Detecter : %d", msg.intAD);
-	arrow = msg.intAD;
+	mutex.lock();{
+		//ROS_INFO("Arrow Detecter : %d", msg.intAD);
+		arrow = msg.intAD;
+	}mutex.unlock();
 }
 
 

@@ -205,11 +205,13 @@ void poseMessageReceivedRGB(const sensor_msgs::ImageConstPtr& msg) {
 			printf("\narrow direction is left\n");
 			msgAD.intAD = 0; //left
 		}
+	pub.publish(msgAD);
+	ros::Duration(5).sleep();
 	}else{
      //printf("arrow not detected\n");
      msgAD.intAD = -1; // no arrow
-   }
 	pub.publish(msgAD);
+   }
 
 	
 	//clear
